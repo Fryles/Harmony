@@ -1,0 +1,183 @@
+/* styles.css */
+@import "https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css";
+body,
+html {
+	height: 100%;
+	overflow: hidden;
+	font-family: "Ubuntu", sans-serif;
+	font-weight: 400;
+	font-style: normal;
+	user-select: none;
+}
+.left-bar {
+	width: 70px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding-top: 10px;
+	justify-content: space-between;
+	z-index: 2;
+}
+.server-list {
+	width: 70px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding-top: 10px;
+	margin-left: auto;
+}
+.server-item {
+	width: 3em;
+	height: 3em;
+	border-radius: 100%;
+	margin-bottom: 10px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: bold;
+	cursor: pointer;
+	background-color: var(--bulma-grey-dark);
+
+	transition: all 0.3s ease;
+}
+.server-item:hover {
+	transform: scale(1.1);
+	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+	color: #fff;
+}
+
+.main-area {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	flex-wrap: wrap;
+}
+#chat {
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	width: calc-size(auto, size);
+	transition: all 0.3s ease;
+	z-index: 1;
+}
+#chat-messages {
+	flex: 1;
+	padding: 20px;
+	overflow-y: auto;
+}
+.chat-input {
+	padding: 10px;
+}
+.container-flex {
+	display: flex;
+	height: 100vh;
+}
+.voice-area {
+	position: fixed;
+	right: 1em;
+	top: 1em;
+	width: 70px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding-top: 10px;
+	background-color: hsl(240, 2%, 26%);
+	margin-left: auto;
+	z-index: 5;
+	border-radius: 25px;
+}
+
+.voice-ico {
+	width: 50px;
+	height: 50px;
+	margin-bottom: 10px;
+}
+
+.voice-prof {
+	width: 50px;
+	height: 50px;
+	border-radius: 25px;
+	margin-bottom: 10px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: bold;
+	cursor: pointer;
+	background-color: hsl(240, 2%, 26%);
+	color: #fff;
+	transition: all 0.3s ease;
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.voice-prof:hover {
+	transform: scale(1.1);
+	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+	background-color: hsl(240, 2%, 36%);
+	color: #fff;
+}
+
+.options-item {
+	border-radius: 100%;
+	transition: all 0.3s ease;
+	padding: 0.25em;
+}
+.options-item:hover {
+	transform: scale(1.1);
+	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+	background-color: hsl(240, 2%, 36%);
+	cursor: pointer;
+}
+.options-list {
+	width: 70px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 10px 0;
+	background-color: var(--bulma-grey-dark);
+	margin-left: auto;
+	border-radius: 25px 25px 0 0;
+	box-shadow: 0 0px 8px 8px rgba(0, 0, 0, 0.2);
+	z-index: 5;
+}
+
+.selected {
+	background-color: var(--bulma-primary-soft) !important;
+	color: var(--bulma-primary-soft-invert);
+}
+
+.slider {
+	width: 40%;
+	accent-color: var(--bulma-primary);
+}
+
+.ctc:hover {
+	cursor: pointer !important;
+}
+
+#friends {
+	height: 100vh;
+	border-right: var(--bulma-black-ter) 8px solid;
+	transition: all 0.3s ease;
+	width: calc-size(auto, size);
+	z-index: 1;
+}
+
+.friend-item {
+	padding: 0.6em 1em;
+	border-bottom: var(--bulma-black-ter) 2px solid;
+	transition: all 0.3s ease;
+}
+
+.friend-item:nth-child(odd) {
+	background-color: var(--bulma-grey-dark);
+}
+.addBtn:hover {
+	color: var(--bulma-success) !important;
+	cursor: pointer;
+}
+.friend-item:hover:not(#friends-header) {
+	cursor: pointer;
+	box-shadow: 0 0px 5px 3px rgba(0, 0, 0, 0.2);
+	color: #fff;
+	font-weight: bold;
+}

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+
+  <link href="./styles.css" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap"
+    rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.5/purify.min.js"
+    integrity="sha512-/CUtA84sWWqWEBejNrrtWa7Yc4cth3Ome2ymvCKOo9YcZ4sh98tndUy4LutE2xGcAgD4fyz16y+gSyJdGCB5ww=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+    integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script defer src="./bulma.js"></script>
+  <title>Harmony</title>
+</head>
+
+<body>
+
+  <div class="container-flex">
+    <!-- Server List -->
+    <div class="left-bar has-background-black-ter">
+      <div class="server-list" id="server-list">
+        <div class="server-item selected" name="HARMONY-FRIENDS-LIST">
+          <i class="fas fa-lg fa-users"></i>
+        </div>
+
+
+      </div>
+      <div class="options-list">
+        <div class="options-item modal-button" data-target="settings-modal">
+          <span class="icon has-text-primary is-medium">
+            <i class="fa-solid  fa-lg fa-gear"></i>
+          </span>
+        </div>
+        <div class="options-item">
+          <span class="icon has-text-primary is-medium">
+            <i class="fas fa-lg fa-user"></i>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- main Area -->
+    <div class="main-area has-background-dark">
+
+      <!-- voice bar -->
+      <div class="voice-area has-background-black-ter is-rounded">
+        <span class="icon has-text-success voice-ico">
+          <i class="fa-solid fa-volume-high"></i>
+        </span>
+        <div class="voice-prof">toof</div>
+        <div class="voice-prof">ultra</div>
+        <div class="voice-prof">fryle</div>
+      </div>
+      <!-- friends list -->
+      <div id="friends">
+        <div class="friend-item has-background-grey-dark" id="friends-header">
+          <h2 class="title is-5">Your Friends <span class="icon is-pulled-right"><i
+                class="addBtn fas fa-lg fa-plus-circle"></i></span></h2>
+        </div>
+      </div>
+
+
+
+      <div id="chat">
+        <div id="chat-messages">
+        </div>
+        <div class="chat-input has-background-black-ter ">
+          <input class="input is-rounded" type="text" placeholder="Type a message..." />
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <!-- Settings Modal -->
+  <div class="modal" id="settings-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+      <header class="modal-card-head has-background-primary-soft has-text-primary-soft-invert py-4">
+        <p class="modal-card-title">Settings</p>
+        <button class="delete is-large" aria-label="close"></button>
+      </header>
+      <section class="modal-card-body">
+        <!-- Prefs list filled with prefs.json -->
+        <div class="field">
+          <label class="label">Username</label>
+          <div class="control">
+            <input class="input" type="text" id="username" placeholder="Enter username">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">ID</label>
+          <div class="control">
+            <input class="input" style="width: 70%;transition: all 0.3s ease;" disabled type="text" id="userid"
+              placeholder="ID">
+            <span class="tag is-primary is-hoverable is-large" style="width: 28%;"
+              onclick="navigator.clipboard.writeText(document.getElementById('userid').value);this.innerText='Copied!';setTimeout((e)=> e.innerText='Copy',3000,this)">Copy</span>
+          </div>
+        </div>
+        <hr>
+        <div class=" field">
+          <label class="label">Video Input Device</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="videoInputDevice">
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label">Audio Input Device</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="audioInputDevice">
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label">Audio Output Device</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="audioOutputDevice">
+              </select>
+            </div>
+          </div>
+        </div>
+
+
+        <div class="field">
+          <label class="label">Input Gain</label>
+          <div class="control">
+            <span class="icon has-text-primary is-medium">
+              <i class="fa-solid fa-microphone"></i>
+            </span>
+            <input class="slider is-fullwidth is-primary" type="range" id="inputGain" min="0" max="2" step="0.05"
+              value="1.0">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label">Output Volume</label>
+          <div class="control">
+            <span class="icon has-text-primary is-medium">
+              <i class="fa-solid fa-volume-high"></i>
+            </span>
+            <input class="slider is-fullwidth" type="range" id="outputVolume" min="0" max="1" step="0.05" value="0.8">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="checkbox">
+            <input type="checkbox" id="enableNoiseSuppression">
+            Enable Noise Suppression
+          </label>
+        </div>
+
+
+        <hr>
+        <div class="field">
+          <label class="label">Accent Color</label>
+          <div class="control">
+            <input class="input" type="text" id="accentColor" placeholder="#424242">
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label">Theme</label>
+          <div class="control">
+            <div class="select">
+              <select id="theme">
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="checkbox">
+            <input type="checkbox" id="notifications">
+            Enable Notifications
+          </label>
+        </div>
+      </section>
+      <footer class="modal-card-foot">
+        <div class="buttons">
+          <button class="button is-primary" id="settings-save">Save changes</button>
+          <button class="button">Cancel</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+  <!-- You can also require other files to run in this process -->
+  <script src="./renderer.js"></script>
+</body>
+
+</html>

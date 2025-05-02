@@ -1,0 +1,70 @@
+{
+  "user": {
+    "username": "user",
+    "userid": "b1ff8fc9-f830-41e1-a679-17cf2b87a744"
+  },
+  "servers": [
+    {
+      "name": "pub",
+      "id": 123,
+      "password": ""
+    }
+  ],
+  "settings": {
+    "theme": "dark",
+    "accentColor": "#f56bf9",
+    "language": "en-US",
+    "notifications": true,
+    "checkUpdate": true
+  },
+  "friends": [
+    {
+      "name": "toof",
+      "nick": "buh",
+      "id": "ff25b045-a5dd-47f3-baab-3b2b2bc09584"
+    },
+    {
+      "name": "ulltra",
+      "nick": "",
+      "id": "01d6ef27-3547-49fa-a13a-04a6c723a07e"
+    }
+  ],
+  "devices": {
+    "videoInputDevices": [],
+    "audioInputDevices": [],
+    "audioOutputDevices": [
+      {
+        "deviceId": "default",
+        "kind": "audiooutput",
+        "label": "Default - Mac mini Speakers (Built-in)"
+      },
+      {
+        "deviceId": "8c9f8879e73bbe41a62d6b46974c8207e5f5f195a7a027f6c4cb34ffe2301d19",
+        "kind": "audiooutput",
+        "label": "HP 24mh (HDMI)"
+      },
+      {
+        "deviceId": "3ba3c3d25cf966eed55eb5a85c028eb87a86a5ac1b23e578c1c70fd9411a28a7",
+        "kind": "audiooutput",
+        "label": "HP 24mh (DisplayPort)"
+      },
+      {
+        "deviceId": "1e1ef80854158af93f92a9a18ea1cff347d2b738ec9f701f26dcf0bd72fb9798",
+        "kind": "audiooutput",
+        "label": "Mac mini Speakers (Built-in)"
+      }
+    ],
+    "audioOutputDevice": {
+      "deviceId": "default",
+      "kind": "audiooutput",
+      "label": "Default - Mac mini Speakers (Built-in)"
+    },
+    "videoInputDevice": null,
+    "audioInputDevice": null
+  },
+  "audio": {
+    "inputGain": 1,
+    "outputVolume": 1,
+    "enableNoiseSuppression": true
+  }
+}
