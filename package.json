@@ -17,7 +17,7 @@
   "author": "GitHub",
   "license": "CC0-1.0",
   "devDependencies": {
-    "electron": "^36.0.0"
+    "electron": "^36.1.0"
   },
   "dependencies": {
     "bulma": "^1.0.4",
