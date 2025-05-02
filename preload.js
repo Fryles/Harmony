@@ -50,7 +50,7 @@ function loadServers(prefs) {
 	servers.forEach((server) => {
 		let el = document.createElement("div");
 		el.classList.add("server-item");
-		el.setAttribute("name", server.name);
+		el.setAttribute("name", server.id);
 		el.innerHTML = server.name;
 		document.getElementById("server-list").appendChild(el);
 	});
@@ -83,10 +83,11 @@ function closeModals() {
 }
 
 function defaultPrefs() {
+	let uid = crypto.randomUUID();
 	let prefs = {
 		user: {
-			username: "user",
-			userid: crypto.randomUUID(),
+			username: psuedoUser(uid),
+			userId: uid,
 		},
 		servers: [
 			{
@@ -104,14 +105,9 @@ function defaultPrefs() {
 		},
 		friends: [
 			{
-				name: "toof",
-				nick: "buh",
-				id: crypto.randomUUID(),
-			},
-			{
-				name: "ulltra",
-				nick: "",
-				id: crypto.randomUUID(),
+				name: "fran",
+				nick: "frien",
+				id: "whatmybabysaid",
 			},
 		],
 		devices: {
@@ -152,7 +148,7 @@ function loadSettings(prefs) {
 
 	// Username
 	document.getElementById("username").value = prefs.user.username;
-	document.getElementById("userid").value = prefs.user.userid;
+	document.getElementById("userid").value = prefs.user.userId;
 
 	// Devices - populate dropdowns
 	populateDeviceDropdown(
@@ -290,4 +286,154 @@ function populateDeviceDropdown(selectId, devices, selectedDevice) {
 		option.textContent = device.label || device.deviceId || device;
 		select.appendChild(option);
 	});
+}
+
+function psuedoUser(userId) {
+	//if we cant find a username, we give a unique readable one based on uuuid
+	var prefixes = [
+		"Cool",
+		"Epic",
+		"Funky",
+		"Sneaky",
+		"Wobbly",
+		"Spicy",
+		"Quantum",
+		"Fluffy",
+		"Turbo",
+		"Mega",
+		"Ultra",
+		"Dank",
+		"Silly",
+		"Chill",
+		"Radical",
+		"Bizarre",
+		"Cosmic",
+		"Tiny",
+		"Giga",
+		"Sleepy",
+		"Noisy",
+		"Silent",
+		"Cheesy",
+		"Cranky",
+		"Jumpy",
+		"Loopy",
+		"Wonky",
+		"Zippy",
+		"Groovy",
+		"Moist",
+		"Chunky",
+		"Soggy",
+		"Yeet",
+		"Boaty",
+		"Saucy",
+		"Snazzy",
+		"Lumpy",
+		"Derpy",
+		"Swole",
+		"Toasty",
+		"Spooky",
+		"Bouncy",
+		"Goofy",
+		"Lazy",
+		"Nerdy",
+		"Feral",
+		"Crusty",
+		"Frosty",
+		"Salty",
+		"Sweaty",
+		"Thicc",
+		"Sussy",
+		"Drippy",
+		"Wacky",
+		"Borked",
+		"Dopey",
+		"Zonky",
+		"Yolo",
+		"Vibey",
+		"Breezy",
+		"Dizzy",
+		"Meme",
+		"Pog",
+		"Blep",
+		"Snek",
+	];
+	var suffixes = [
+		"Cat",
+		"Dog",
+		"Monkey",
+		"Fox",
+		"Bear",
+		"Otter",
+		"Penguin",
+		"Bunny",
+		"Lion",
+		"Tiger",
+		"Wolf",
+		"Duck",
+		"Goose",
+		"Moose",
+		"Horse",
+		"Ferret",
+		"Whale",
+		"Mouse",
+		"Elephant",
+		"Koala",
+		"Parrot",
+		"Hawk",
+		"Sheep",
+		"Goat",
+		"Frog",
+		"Lizard",
+		"Snake",
+		"Zebra",
+		"Giraffe",
+		"Moose",
+		"Rhino",
+		"Hippo",
+		"Fish",
+		"Boat",
+		"Crab",
+		"Bee",
+		"Bat",
+		"Goose",
+		"Ox",
+		"Goat",
+		"Ghost",
+		"Kangaroo",
+		"Cow",
+		"Moose",
+		"Owl",
+		"Rat",
+		"Cat",
+		"Penguin",
+		"Seal",
+		"Shark",
+		"Duck",
+		"Imp",
+		"Crow",
+		"Worm",
+		"Dog",
+		"Sloth",
+		"Yak",
+		"Mole",
+		"Vole",
+		"Ant",
+		"Dove",
+		"Moth",
+		"Pug",
+		"Snake",
+	];
+	// Simple hash to pick a prefix and suffix based on userId
+	function hashCode(str) {
+		let hash = 0;
+		for (let i = 0; i < str.length; i++) {
+			hash = (hash << prefixes.length) - hash + str.charCodeAt(i);
+			hash |= 0;
+		}
+		return Math.abs(hash);
+	}
+	const hash = hashCode(userId);
+	const prefix = prefixes[hash % prefixes.length];
+	const suffix = suffixes[hash % suffixes.length];
+	return `${prefix} ${suffix}`;
 }

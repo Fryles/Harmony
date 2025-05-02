@@ -43,7 +43,7 @@ async function main() {
 function sendChat(content) {
 	const msg = {
 		timestamp: Date.now(),
-		user: localPrefs.user.userid,
+		user: localPrefs.user.userId,
 		content: content,
 	};
 	updateChat(msg);
@@ -66,28 +66,32 @@ function displayChat(chatId) {
 	//clear chat and set all messages
 	document.getElementById("chat-messages").innerHTML = "";
 	messages.forEach((msg) => {
-		let el = document.createElement("p");
-		let un = document.createElement("span");
-		un.className = "tag is-primary is-medium";
-		un.innerHTML = DOMPurify.sanitize(userLookup(msg.user));
-		el.innerHTML = "";
-		el.appendChild(un);
-		el.innerHTML += ": " + DOMPurify.sanitize(msg.content);
-		document.getElementById("chat-messages").appendChild(el);
+		updateChat(msg);
 	});
 }
 
-function updateChat(message) {
-	//add message to chat, store it to browser
-	if (!message || !message.user || !message.content) return;
-	const sanitizedContent = DOMPurify.sanitize(message.content);
+function updateChat(msg) {
+	//add msg to chat
+	if (!msg || !msg.user || !msg.content) {
+		console.log("bad msg");
+		return;
+	}
+	const sanitizedContent = DOMPurify.sanitize(msg.content);
 	let el = document.createElement("p");
 	let un = document.createElement("span");
-	un.className = "tag is-primary is-medium";
-	un.innerHTML = userLookup(message.user);
+	un.className = "tag";
+	if (msg.user == localPrefs.user.userId) {
+		un.classList.add("is-primary");
+		el.style = "text-align: end;";
+	}
+	let sender = userLookup(msg.user);
+	un.innerHTML =
+		sender.nick != "" && sender.nick != undefined
+			? `${sender.nick} (${sender.name})`
+			: sender.name;
 	el.innerHTML = "";
 	el.appendChild(un);
-	el.innerHTML += ": " + sanitizedContent;
+	el.innerHTML += "<br>" + sanitizedContent;
 	document.getElementById("chat-messages").appendChild(el);
 }
 
@@ -108,7 +112,7 @@ function storeChat(msg, chatId) {
 	localStorage.setItem(key, JSON.stringify(messages));
 }
 
-function updatePage() {
+function updateFriendsTab() {
 	if (selectedServer == "HARMONY-FRIENDS-LIST") {
 		document.getElementById("friends").style.display = "block";
 		document.getElementById("friends").style.borderWidth = "8px";
@@ -118,6 +122,8 @@ function updatePage() {
 		document.querySelectorAll(".friend-item").forEach((el) => {
 			el.style.display = "block";
 		});
+		currentChat = selectedFriend;
+		displayChat(currentChat);
 	} else {
 		document.getElementById("friends").style.width = "0 !important";
 		document.getElementById("friends").style.borderWidth = "2px";
@@ -151,7 +157,8 @@ function selectFriend(e) {
 	// Add 'selected' class to the clicked server item
 	e.target.classList.add("selected");
 	selectedFriend = e.target.getAttribute("name");
-	updatePage();
+	currentChat = selectedFriend;
+	displayChat(currentChat);
 }
 
 function selectServerItem(e) {
@@ -173,14 +180,15 @@ function selectServerItem(e) {
 	// Add 'selected' class to the clicked server item
 	e.target.classList.add("selected");
 	selectedServer = e.target.getAttribute("name");
-	selectedFriend = "";
-	updatePage();
+	currentChat = selectedServer;
+	updateFriendsTab();
+	displayChat(currentChat);
 }
 
 function userLookup(userId) {
 	if (!localPrefs || !localPrefs.friends)
 		return { name: psuedoUser(userId), nick: "" };
-	if (userId === localPrefs.user.userid) {
+	if (userId === localPrefs.user.userId) {
 		return { name: localPrefs.user.username, nick: "" };
 	}
 	const friend = localPrefs.friends.find((f) => f.id === userId);
@@ -343,6 +351,7 @@ function psuedoUser(userId) {
 async function storePrefs() {
 	//get prefs from HTML, then store, and load them to our ui
 
+	localPrefs = await window.electronAPI.getPrefs();
 	// Settings
 	localPrefs.settings.accentColor =
 		document.getElementById("accentColor").value;

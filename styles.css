@@ -64,8 +64,9 @@ html {
 	flex: 1;
 	padding: 20px;
 	overflow-y: auto;
+	align-content: end;
 }
-.chat-input {
+.chat-input-wrap {
 	padding: 10px;
 }
 .container-flex {

@@ -25,6 +25,8 @@
 
 <body>
 
+  <script src="./rtc.js"></script>
+
   <div class="container-flex">
     <!-- Server List -->
     <div class="left-bar has-background-black-ter">
@@ -74,8 +76,15 @@
       <div id="chat">
         <div id="chat-messages">
         </div>
-        <div class="chat-input has-background-black-ter ">
-          <input class="input is-rounded" type="text" placeholder="Type a message..." />
+        <div class="chat-input-wrap has-background-black-ter ">
+          <p class="control has-icons-right">
+            <input class="input is-rounded" id="chat-input" type="text" placeholder="Type a message..."
+              onkeydown="if(event.key==='Enter'){sendChat(this.value); this.value='';}" />
+            <span id="sendBtn" class="icon is-right is-clickable"
+              onclick="const input=this.previousElementSibling;sendChat(input.value);input.value='';">
+              <i class="fas fa-md fa-paper-plane"></i>
+            </span>
+          </p>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 {
   "user": {
-    "username": "user",
-    "userid": "b1ff8fc9-f830-41e1-a679-17cf2b87a744"
+    "username": "Snazzy Bunny",
+    "userId": "9ab33484-e865-4408-b3ef-e3dc201cd646"
   },
   "servers": [
     {
@@ -12,21 +12,16 @@
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#f56bf9",
+    "accentColor": "#856bf9",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true
   },
   "friends": [
     {
-      "name": "toof",
-      "nick": "buh",
-      "id": "ff25b045-a5dd-47f3-baab-3b2b2bc09584"
-    },
-    {
-      "name": "ulltra",
-      "nick": "",
-      "id": "01d6ef27-3547-49fa-a13a-04a6c723a07e"
+      "name": "fran",
+      "nick": "frien",
+      "id": "whatmybabysaid"
     }
   ],
   "devices": {
@@ -58,13 +53,11 @@
       "deviceId": "default",
       "kind": "audiooutput",
       "label": "Default - Mac mini Speakers (Built-in)"
-    },
-    "videoInputDevice": null,
-    "audioInputDevice": null
+    }
   },
   "audio": {
     "inputGain": 1,
-    "outputVolume": 1,
+    "outputVolume": 0.8,
     "enableNoiseSuppression": true
   }
 }
