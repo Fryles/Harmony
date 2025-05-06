@@ -10,12 +10,23 @@ var selectedServer = "HARMONY-FRIENDS-LIST";
 var selectedFriend;
 var currentChat;
 var localPrefs;
+var userId;
+var secret;
+//TODO move password out of frontend probably
 main();
 
 async function main() {
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
-	//atatch listeners
+	userId = crypto.randomUUID();
+	// Hash userId with password to create a secret
+	secret = await digestPwd(
+		`${localPrefs.user.userId}:${localPrefs.user.password}`
+	);
+	RTC.initRTC();
+	console.log("Secret: ", secret);
+
+	// attach listeners
 	document.getElementById("settings-save").onclick = () => storePrefs();
 
 	const serverListObserver = new MutationObserver(() => {
@@ -37,6 +48,13 @@ async function main() {
 	friendsListObserver.observe(document.getElementById("friends"), {
 		subtree: true,
 		childList: true,
+	});
+
+	document.querySelectorAll(".server-item").forEach((div) => {
+		div.addEventListener("click", selectServerItem, true);
+	});
+	document.querySelectorAll(".friend-item").forEach((div) => {
+		div.addEventListener("click", selectFriend, true);
 	});
 }
 
@@ -68,6 +86,8 @@ function displayChat(chatId) {
 	messages.forEach((msg) => {
 		updateChat(msg);
 	});
+	//connect to chat rtc
+	RTC.joinChannel(chatId);
 }
 
 function updateChat(msg) {
@@ -112,33 +132,10 @@ function storeChat(msg, chatId) {
 	localStorage.setItem(key, JSON.stringify(messages));
 }
 
-function updateFriendsTab() {
-	if (selectedServer == "HARMONY-FRIENDS-LIST") {
-		document.getElementById("friends").style.display = "block";
-		document.getElementById("friends").style.borderWidth = "8px";
-		document.getElementById("friends").style.width = "calc-size(auto, size)";
-		document.getElementById("chat").style.width = "calc-size(auto, size)";
-		document.getElementById("friends-header").style.display = "block";
-		document.querySelectorAll(".friend-item").forEach((el) => {
-			el.style.display = "block";
-		});
-		currentChat = selectedFriend;
-		displayChat(currentChat);
-	} else {
-		document.getElementById("friends").style.width = "0 !important";
-		document.getElementById("friends").style.borderWidth = "2px";
-		document.querySelectorAll(".friend-item").forEach((el) => {
-			el.style.display = "none";
-		});
-		document.getElementById("friends-header").style.display = "none";
-		document.getElementById("chat").style.width = "100%";
-		setTimeout(() => {
-			document.getElementById("friends").style.display = "none";
-		}, 300);
-	}
-}
-
 function selectFriend(e) {
+	if (e.target.id == "friends-header" || e.target.id == "addFriendBtn") {
+		return;
+	}
 	//stop icons from tweaking out
 	if (e.target.tagName.toLowerCase() != "div") {
 		if (e.target.parentElement) {
@@ -157,8 +154,7 @@ function selectFriend(e) {
 	// Add 'selected' class to the clicked server item
 	e.target.classList.add("selected");
 	selectedFriend = e.target.getAttribute("name");
-	currentChat = selectedFriend;
-	displayChat(currentChat);
+	displayChat(selectedFriend);
 }
 
 function selectServerItem(e) {
@@ -180,9 +176,31 @@ function selectServerItem(e) {
 	// Add 'selected' class to the clicked server item
 	e.target.classList.add("selected");
 	selectedServer = e.target.getAttribute("name");
-	currentChat = selectedServer;
-	updateFriendsTab();
-	displayChat(currentChat);
+
+	//update friends tab and chat respectively
+	if (selectedServer == "HARMONY-FRIENDS-LIST") {
+		document.getElementById("friends").style.display = "block";
+		document.getElementById("friends").style.borderWidth = "8px";
+		document.getElementById("friends").style.width = "calc-size(auto, size)";
+		document.getElementById("chat").style.width = "calc-size(auto, size)";
+		document.getElementById("friends-header").style.display = "block";
+		document.querySelectorAll(".friend-item").forEach((el) => {
+			el.style.display = "block";
+		});
+		displayChat(selectedFriend);
+	} else {
+		document.getElementById("friends").style.width = "0 !important";
+		document.getElementById("friends").style.borderWidth = "2px";
+		document.querySelectorAll(".friend-item").forEach((el) => {
+			el.style.display = "none";
+		});
+		document.getElementById("friends-header").style.display = "none";
+		document.getElementById("chat").style.width = "100%";
+		setTimeout(() => {
+			document.getElementById("friends").style.display = "none";
+		}, 300);
+		displayChat(selectedServer);
+	}
 }
 
 function userLookup(userId) {
@@ -361,6 +379,15 @@ async function storePrefs() {
 
 	// Username
 	localPrefs.user.username = document.getElementById("username").value;
+	if (!localPrefs.user.username) {
+		alert("Username cannot be empty retard.");
+		return;
+	}
+	localPrefs.user.password = document.getElementById("password").value;
+	if (!localPrefs.user.password) {
+		alert("Password cannot be empty retard.");
+		return;
+	}
 
 	// Devices
 	const getSelectedDevice = (selectId, devices) => {
@@ -394,4 +421,15 @@ async function storePrefs() {
 
 	// Save and reload
 	window.electronAPI.updatePrefs(localPrefs);
+}
+
+//hash password to hex str
+async function digestPwd(pwd) {
+	const msgUint8 = new TextEncoder().encode(pwd); // encode as (utf-8) Uint8Array
+	const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgUint8); // hash the message
+	const hashArray = Array.from(new Uint8Array(hashBuffer)); // convert buffer to byte array
+	const hashHex = hashArray
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join(""); // convert bytes to hex string
+	return hashHex;
 }

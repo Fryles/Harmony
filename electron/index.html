@@ -19,6 +19,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
     integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
     crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"
+    integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
+    crossorigin="anonymous"></script>
   <script defer src="./bulma.js"></script>
   <title>Harmony</title>
 </head>
@@ -66,7 +69,7 @@
       <!-- friends list -->
       <div id="friends">
         <div class="friend-item has-background-grey-dark" id="friends-header">
-          <h2 class="title is-5">Your Friends <span class="icon is-pulled-right"><i
+          <h2 class="title is-5">Your Friends <span class="icon is-pulled-right"><i id="addFriendBtn"
                 class="addBtn fas fa-lg fa-plus-circle"></i></span></h2>
         </div>
       </div>
@@ -113,6 +116,16 @@
               placeholder="ID">
             <span class="tag is-primary is-hoverable is-large" style="width: 28%;"
               onclick="navigator.clipboard.writeText(document.getElementById('userid').value);this.innerText='Copied!';setTimeout((e)=> e.innerText='Copy',3000,this)">Copy</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Password</label>
+          <div class="control has-icons-right">
+            <input class="input" type="password" id="password" placeholder="Create a password">
+            <span id="passView" class="icon is-right is-clickable"
+              onclick="const input=this.previousElementSibling;input.type=input.type==='password'?'text':'password';this.innerHTML=input.type==='password'?'<i class=\'fas fa-md fa-eye-slash\'></i>':'<i class=\'fas fa-md fa-eye\'></i>';">
+              <i class="fas fa-md fa-eye-slash"></i>
+            </span>
           </div>
         </div>
         <hr>

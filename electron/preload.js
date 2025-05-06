@@ -88,6 +88,7 @@ function defaultPrefs() {
 		user: {
 			username: psuedoUser(uid),
 			userId: uid,
+			password: "",
 		},
 		servers: [
 			{
@@ -108,6 +109,7 @@ function defaultPrefs() {
 				name: "fran",
 				nick: "frien",
 				id: "whatmybabysaid",
+				chatId: "special",
 			},
 		],
 		devices: {
