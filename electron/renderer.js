@@ -23,7 +23,8 @@ async function main() {
 	userSecret = await digestPwd(
 		`${localPrefs.user.userId}:${localPrefs.user.password}`
 	);
-	RTC.initRTC();
+	ChatInterface = new rtcChat(userId);
+	ChatInterface.initRTCChat();
 	console.log("Secret: ", userSecret);
 
 	// attach listeners
@@ -73,7 +74,7 @@ function sendChat(content) {
 	};
 	updateChat(msg);
 	storeChat(msg, currentChat);
-	RTC.sendMessage(JSON.stringify(msg));
+	ChatInterface.sendMessage(JSON.stringify(msg));
 }
 
 function rcvChat(msg) {
@@ -102,7 +103,7 @@ function displayChat(chatId) {
 		updateChat(msg);
 	});
 	//connect to chat rtc
-	RTC.joinChannel(chatId);
+	ChatInterface.joinChannel(chatId);
 }
 
 function updateChat(msg) {
