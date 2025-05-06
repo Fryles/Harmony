@@ -11,7 +11,7 @@ var selectedFriend;
 var currentChat;
 var localPrefs;
 var userId;
-var secret;
+var userSecret;
 //TODO move password out of frontend probably
 main();
 
@@ -20,11 +20,11 @@ async function main() {
 	localPrefs = await window.electronAPI.getPrefs();
 	userId = crypto.randomUUID();
 	// Hash userId with password to create a secret
-	secret = await digestPwd(
+	userSecret = await digestPwd(
 		`${localPrefs.user.userId}:${localPrefs.user.password}`
 	);
 	RTC.initRTC();
-	console.log("Secret: ", secret);
+	console.log("Secret: ", userSecret);
 
 	// attach listeners
 	document.getElementById("settings-save").onclick = () => storePrefs();
@@ -56,20 +56,35 @@ async function main() {
 	document.querySelectorAll(".friend-item").forEach((div) => {
 		div.addEventListener("click", selectFriend, true);
 	});
+
+	// document
+	// 	.getElementById("voice-mute")
+	// 	.addEventListener("click", RTC.voiceMute);
+	// document
+	// 	.getElementById("voice-call")
+	// 	.addEventListener("click", RTC.startVoiceCall);
 }
 
 function sendChat(content) {
 	const msg = {
 		timestamp: Date.now(),
-		user: localPrefs.user.userId,
+		user: userId,
 		content: content,
 	};
+	updateChat(msg);
+	storeChat(msg, currentChat);
+	RTC.sendMessage(JSON.stringify(msg));
+}
+
+function rcvChat(msg) {
+	msg = JSON.parse(msg);
 	updateChat(msg);
 	storeChat(msg, currentChat);
 }
 
 function displayChat(chatId) {
 	//get messages from browser
+	currentChat = chatId;
 	const key = `chat_${chatId}`;
 	var messages = [];
 	try {
@@ -100,7 +115,7 @@ function updateChat(msg) {
 	let el = document.createElement("p");
 	let un = document.createElement("span");
 	un.className = "tag";
-	if (msg.user == localPrefs.user.userId) {
+	if (msg.user == userId) {
 		un.classList.add("is-primary");
 		el.style = "text-align: end;";
 	}
@@ -116,6 +131,8 @@ function updateChat(msg) {
 }
 
 function storeChat(msg, chatId) {
+	//TODO THIS IS KINDA BLOATED
+
 	//adds message to respective chat and stores it
 	const key = `chat_${chatId}`;
 	let messages = [];
@@ -129,6 +146,30 @@ function storeChat(msg, chatId) {
 		messages = [];
 	}
 	messages.push(msg);
+	//sort by timestamp
+	messages.sort((a, b) => a.timestamp - b.timestamp);
+
+	//filter dups (can occur with multiple windows/instances)
+	messages = messages.filter(
+		(m, i, arr) =>
+			arr.findIndex(
+				(x) =>
+					x.timestamp === m.timestamp &&
+					x.user === m.user &&
+					x.content === m.content
+			) === i
+	);
+
+	//constrain to less than localprefs maxMsgHistory
+	if (
+		localPrefs &&
+		localPrefs.settings &&
+		typeof localPrefs.settings.maxMsgHistory === "number" &&
+		messages.length > localPrefs.settings.maxMsgHistory
+	) {
+		messages = messages.slice(-localPrefs.settings.maxMsgHistory);
+	}
+
 	localStorage.setItem(key, JSON.stringify(messages));
 }
 
@@ -154,10 +195,15 @@ function selectFriend(e) {
 	// Add 'selected' class to the clicked server item
 	e.target.classList.add("selected");
 	selectedFriend = e.target.getAttribute("name");
-	displayChat(selectedFriend);
+	let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
+	if (privFriend && privFriend.chatId) {
+		displayChat(privFriend.chatId);
+	} else {
+		console.log("Error finding friend chat for ", selectedFriend);
+	}
 }
 
-function selectServerItem(e) {
+async function selectServerItem(e) {
 	//stop icons from tweaking out
 	if (e.target.tagName.toLowerCase() != "div") {
 		if (e.target.parentElement) {
@@ -187,7 +233,12 @@ function selectServerItem(e) {
 		document.querySelectorAll(".friend-item").forEach((el) => {
 			el.style.display = "block";
 		});
-		displayChat(selectedFriend);
+		let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
+		if (privFriend && privFriend.chatId) {
+			displayChat(privFriend.chatId);
+		} else {
+			console.log("Error finding friend chat for ", selectedFriend);
+		}
 	} else {
 		document.getElementById("friends").style.width = "0 !important";
 		document.getElementById("friends").style.borderWidth = "2px";
@@ -199,7 +250,18 @@ function selectServerItem(e) {
 		setTimeout(() => {
 			document.getElementById("friends").style.display = "none";
 		}, 300);
-		displayChat(selectedServer);
+
+		let privServer = localPrefs.servers.find((f) => f.id == selectedServer);
+		if (
+			privServer &&
+			privServer.password !== null &&
+			privServer.password !== undefined
+		) {
+			let hash = await digestPwd(`${privServer}:${privServer.password}`);
+			displayChat(hash);
+		} else {
+			console.log("Error finding Server password for ", selectedServer);
+		}
 	}
 }
 

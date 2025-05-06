@@ -1,136 +1,179 @@
-// Simple WebRTC text messaging using DataChannels
+// Simple WebRTC text messaging using DataChannels (multi-peer support)
 const socket = io("ws://localhost:3030", {
 	auth: {
 		token: "SIGNALING123",
 	},
 });
 var channel = null;
+// Maps to store peer connections and data channels by peerId
+const peerConnections = {};
+const dataChannels = {};
 
 function initRTC() {
 	socket.emit("ready", userId);
 }
 
-function joinChannel(chnl) {
-	if (chnl === null || chnl === undefined) {
-		console.log("bad channel;");
-
+function joinChannel(newChannel) {
+	Object.values(peerConnections).forEach((pc) => {
+		if (pc && pc.signalingState !== "closed") {
+			pc.close();
+		}
+	});
+	Object.keys(peerConnections).forEach((peerId) => {
+		delete peerConnections[peerId];
+		delete dataChannels[peerId];
+	});
+	if (newChannel === null || newChannel === undefined) {
+		console.log("bad channel");
 		return;
 	}
-	socket.emit("joinChannel", chnl, channel);
-	channel = chnl;
-	startConnection();
+	//this also leaves the old channel
+	socket.emit("joinChannel", newChannel, channel);
+	channel = newChannel;
+	console.log("joined ", channel);
 }
+
+socket.on("peers", (data) => {
+	//this is run after we join a new channel
+	//data.peers contains all peers in channel (including self)
+	data.peers.forEach((peerId) => {
+		if (peerId !== userId && !peerConnections[peerId]) {
+			startChatConnection(peerId);
+		}
+	});
+});
 
 socket.on("message", (data) => {
 	console.log(data);
-	if (!data.msg) return;
-	if (data.msg.type == "offer") {
-		handleOffer(data.msg.offer);
-	} else if (data.msg.type == "candidate") {
-		handleCandidate(data.msg.candidate);
-	} else if (data.msg.type == "answer") {
-		handleAnswer(data.msg.answer);
+	if (!data.msg || !data.from) return;
+	const peerId = data.from;
+	switch (data.msg.type) {
+		case "offer":
+			handleOffer(peerId, data.msg.offer);
+			break;
+		case "candidate":
+			handleCandidate(peerId, data.msg.candidate);
+			break;
+		case "answer":
+			handleAnswer(peerId, data.msg.answer);
+			break;
 	}
 });
 
-let peerConnection = null;
-let dataChannel = null;
-
-// ICE servers for NAT traversal (use public STUN)
 const rtcConfig = {
 	iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
 
-// Call this to start a connection as the initiator (caller)
-function startConnection() {
-	peerConnection = new RTCPeerConnection(rtcConfig);
+// Start a connection as initiator (caller) to a specific peer
+function startChatConnection(peerId) {
+	console.log("connecting to: ", peerId);
+	const pc = new RTCPeerConnection(rtcConfig);
+	peerConnections[peerId] = pc;
 
 	// Create data channel for text messages
-	dataChannel = peerConnection.createDataChannel("chat");
-	setupDataChannel();
+	const dc = pc.createDataChannel("chat");
+	dataChannels[peerId] = dc;
+	setupDataChannel(peerId, dc);
 
-	peerConnection.onicecandidate = (event) => {
+	pc.onicecandidate = (event) => {
 		if (event.candidate) {
-			// Send candidate to remote peer via your signaling server
-			sendSignalingMessage({ type: "candidate", candidate: event.candidate });
+			sendSignalingMessage(peerId, {
+				type: "candidate",
+				candidate: event.candidate,
+			});
 		}
 	};
 
-	peerConnection
-		.createOffer()
-		.then((offer) => peerConnection.setLocalDescription(offer))
+	pc.createOffer()
+		.then((offer) => pc.setLocalDescription(offer))
 		.then(() => {
-			// Send offer to remote peer via your signaling server
-			sendSignalingMessage({
+			sendSignalingMessage(peerId, {
 				type: "offer",
-				offer: peerConnection.localDescription,
+				offer: pc.localDescription,
 			});
 		});
 }
 
-// Call this to handle an incoming offer (callee)
-function handleOffer(offer) {
-	peerConnection = new RTCPeerConnection(rtcConfig);
+// Handle incoming offer (callee)
+function handleOffer(peerId, offer) {
+	const pc = new RTCPeerConnection(rtcConfig);
+	peerConnections[peerId] = pc;
 
-	peerConnection.ondatachannel = (event) => {
-		dataChannel = event.channel;
-		setupDataChannel();
+	pc.ondatachannel = (event) => {
+		dataChannels[peerId] = event.channel;
+		setupDataChannel(peerId, event.channel);
 	};
 
-	peerConnection.onicecandidate = (event) => {
+	pc.onicecandidate = (event) => {
 		if (event.candidate) {
-			sendSignalingMessage({ type: "candidate", candidate: event.candidate });
+			sendSignalingMessage(peerId, {
+				type: "candidate",
+				candidate: event.candidate,
+			});
 		}
 	};
 
-	peerConnection
-		.setRemoteDescription(new RTCSessionDescription(offer))
-		.then(() => peerConnection.createAnswer())
-		.then((answer) => peerConnection.setLocalDescription(answer))
+	pc.setRemoteDescription(new RTCSessionDescription(offer))
+		.then(() => pc.createAnswer())
+		.then((answer) => pc.setLocalDescription(answer))
 		.then(() => {
-			sendSignalingMessage({
+			sendSignalingMessage(peerId, {
 				type: "answer",
-				answer: peerConnection.localDescription,
+				answer: pc.localDescription,
 			});
 		});
 }
 
-// Call this to handle an incoming answer (initiator)
-function handleAnswer(answer) {
-	peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-}
-
-// Call this to handle an incoming ICE candidate
-function handleCandidate(candidate) {
-	peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-}
-
-// Send a text message over the data channel
-function sendMessage(text) {
-	if (dataChannel && dataChannel.readyState === "open") {
-		dataChannel.send(text);
+// Handle incoming answer (initiator)
+function handleAnswer(peerId, answer) {
+	const pc = peerConnections[peerId];
+	if (pc) {
+		pc.setRemoteDescription(new RTCSessionDescription(answer));
 	}
 }
 
-// Set up handlers for the data channel
-function setupDataChannel() {
-	dataChannel.onopen = () => {
-		console.log("Data channel open");
-	};
-	dataChannel.onclose = () => {
-		console.log("Data channel closed");
-	};
-	dataChannel.onmessage = (event) => {
-		console.log("Received message:", event.data);
-		// You can call a function here to display the message in your UI
-		if (typeof window.onRTCMessage === "function") {
-			window.onRTCMessage(event.data);
+// Handle incoming ICE candidate
+function handleCandidate(peerId, candidate) {
+	const pc = peerConnections[peerId];
+	if (pc) {
+		pc.addIceCandidate(new RTCIceCandidate(candidate));
+	}
+}
+
+// Send a text message to all connected peers
+function sendMessage(text) {
+	Object.keys(peerConnections).forEach((peerId) => {
+		if (peerId !== userId) {
+			const dc = dataChannels[peerId];
+			if (dc && dc.readyState === "open") {
+				dc.send(text);
+			} else {
+				console.log(`message not sent to ${peerId}`);
+			}
 		}
+	});
+}
+
+// Set up handlers for a data channel
+function setupDataChannel(peerId, dc) {
+	dc.onopen = () => {
+		console.log(`Data channel open with ${peerId}`);
+	};
+	dc.onclose = () => {
+		console.log(`Data channel closed with ${peerId}`);
+	};
+	dc.onmessage = (event) => {
+		console.log(`Received message from ${peerId}:`, event.data);
+		window.rcvChat(event.data, peerId);
 	};
 }
 
-function sendSignalingMessage(msg) {
-	socket.emit("message", channel, { from: userId, target: "all", msg });
+function sendSignalingMessage(peerId, msg) {
+	socket.emit("message", channel, peerId, {
+		from: userId,
+		target: peerId,
+		msg,
+	});
 }
 
 socket.on("uniquenessError", (e) => {
@@ -141,7 +184,7 @@ socket.on("uniquenessError", (e) => {
 window.RTC = {
 	initRTC,
 	joinChannel,
-	startConnection,
+	startChatConnection,
 	handleOffer,
 	handleAnswer,
 	handleCandidate,

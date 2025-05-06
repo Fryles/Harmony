@@ -1,7 +1,7 @@
 {
   "user": {
-    "username": "Vibey Fish",
-    "userId": "8b493145-fec8-4cbe-8bbe-155a9e660cc7",
+    "username": "Snek Goose",
+    "userId": "da15efc6-3841-408c-bed2-a573d99e33b3",
     "password": ""
   },
   "servers": [
@@ -16,13 +16,15 @@
     "accentColor": "#856bf9",
     "language": "en-US",
     "notifications": true,
-    "checkUpdate": true
+    "checkUpdate": true,
+    "maxMsgHistory": 50
   },
   "friends": [
     {
       "name": "fran",
       "nick": "frien",
-      "id": "whatmybabysaid"
+      "id": "whatmybabysaid",
+      "chatId": "special"
     }
   ],
   "devices": {

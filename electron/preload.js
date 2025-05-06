@@ -103,6 +103,7 @@ function defaultPrefs() {
 			language: "en-US",
 			notifications: true,
 			checkUpdate: true,
+			maxMsgHistory: 50,
 		},
 		friends: [
 			{

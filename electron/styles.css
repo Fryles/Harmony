@@ -108,6 +108,12 @@ html {
 	color: #fff;
 	transition: all 0.3s ease;
 	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+	transition: border 0.2s ease;
+	border: rgba(0, 0, 0, 0) 2px solid;
+}
+
+.voice-talking {
+	border: var(--bulma-primary) 2px solid;
 }
 
 .voice-prof:hover {

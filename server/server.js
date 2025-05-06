@@ -47,6 +47,7 @@ io.on("connection", (socket) => {
 		} else {
 			console.log(`Added ${peerId} to connections`);
 			// Let new peer know about all exisiting peers
+
 			socket.send({
 				from: "all",
 				target: peerId,
@@ -55,7 +56,8 @@ io.on("connection", (socket) => {
 					connections: Object.values(connections),
 					bePolite: false,
 				},
-			}); // The new peer doesn't need to be polite.
+			});
+
 			// Create new peer
 			const newPeer = { socketId: socket.id, peerId };
 			// Updates connections object
@@ -64,8 +66,9 @@ io.on("connection", (socket) => {
 			socket.broadcast.emit("message", {
 				from: peerId,
 				target: "all",
-				payload: { action: "open", connections: [newPeer], bePolite: true }, // send connections object with an array containing the only new peer and make all exisiting peers polite.
+				payload: { action: "open", connections: [newPeer], bePolite: true },
 			});
+			// send connections object with an array containing the only new peer and make all exisiting peers polite.
 		}
 	});
 
@@ -77,11 +80,39 @@ io.on("connection", (socket) => {
 			console.log(`${socket.id} joining ${chnl}`);
 		}
 		socket.join(chnl);
+		const peersInChannel = [];
+		for (const peerId in connections) {
+			const peerSocket = io.sockets.sockets.get(connections[peerId].socketId);
+			if (peerSocket && peerSocket.rooms.has(chnl)) {
+				peersInChannel.push(peerId);
+			}
+		}
+		//tell new user what peers to start RTC negotiation with
+		socket.emit("peers", {
+			from: "server",
+			target: socket.id,
+			peers: peersInChannel,
+		});
+		// socket.to(chnl).emit("peers", {
+		// 	from: "server",
+		// 	target: "all",
+		// 	peers: peersInChannel,
+		// });
 	});
 
-	socket.on("message", (channel, message) => {
-		// Send message to all peers expect the sender
-		socket.to(channel).emit("message", message);
+	socket.on("message", (channel, peerId, message) => {
+		// Check if the target peer is in the channel before sending the message
+		const targetPeer = connections[peerId];
+		if (targetPeer) {
+			const targetSocket = io.sockets.sockets.get(targetPeer.socketId);
+			if (targetSocket && targetSocket.rooms.has(channel)) {
+				io.to(targetPeer.socketId).emit("message", message);
+			} else {
+				console.log(`Peer ${peerId} is not in channel ${channel}`);
+			}
+		} else {
+			console.log(`Peer ${peerId} not found`);
+		}
 	});
 
 	socket.on("directMessage", (message) => {
