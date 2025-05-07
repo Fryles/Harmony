@@ -1,31 +1,30 @@
-/**
- * This file is loaded via the <script> tag in the index.html file and will
- * be executed in the renderer process for that window. No Node.js APIs are
- * available in this process because `nodeIntegration` is turned off and
- * `contextIsolation` is turned on. Use the contextBridge API in `preload.js`
- * to expose Node.js functionality from the main process.
- */
-
+// Globals for app
 var selectedServer = "HARMONY-FRIENDS-LIST";
 var selectedFriend;
 var currentChat;
 var localPrefs;
 var userId;
 var userSecret;
-//TODO move password out of frontend probably
+
+//TODO move secret out of frontend probably
 main();
 
 async function main() {
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
-	userId = crypto.randomUUID();
+	userId = crypto.randomUUID(); //localPrefs.user.userId
 	// Hash userId with password to create a secret
-	userSecret = await digestPwd(
-		`${localPrefs.user.userId}:${localPrefs.user.password}`
-	);
-	ChatInterface = new rtcChat(userId);
-	ChatInterface.initRTCChat();
+	userSecret = await hashbrown(`${userId}:${localPrefs.user.password}`);
 	console.log("Secret: ", userSecret);
+
+	//init websocket
+	window.socket = io("ws://localhost:3030", {
+		auth: { token: "SIGNALING123", userId: userId, secret: userSecret },
+	});
+	this.socket.emit("ready", userId);
+	//init chat and voice interfaces
+	rtc = new rtcInterface();
+	// VoiceInterface = new rtcVoice();
 
 	// attach listeners
 	document.getElementById("settings-save").onclick = () => storePrefs();
@@ -67,26 +66,31 @@ async function main() {
 }
 
 function sendChat(content) {
+	//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM CURRENTCHAT
 	const msg = {
 		timestamp: Date.now(),
 		user: userId,
 		content: content,
+		channel: currentChat,
 	};
 	updateChat(msg);
 	storeChat(msg, currentChat);
-	ChatInterface.sendMessage(JSON.stringify(msg));
+	rtc.sendMessage(msg);
 }
 
 function rcvChat(msg) {
 	msg = JSON.parse(msg);
-	updateChat(msg);
-	storeChat(msg, currentChat);
+	channel = msg.channel;
+	if (channel == currentChat) {
+		updateChat(msg);
+	}
+	storeChat(msg, channel);
 }
 
 function displayChat(chatId) {
 	//get messages from browser
-	currentChat = chatId;
-	const key = `chat_${chatId}`;
+	currentChat = `chat:${chatId}`;
+	const key = `chat:${chatId}`;
 	var messages = [];
 	try {
 		const existing = localStorage.getItem(key);
@@ -102,8 +106,8 @@ function displayChat(chatId) {
 	messages.forEach((msg) => {
 		updateChat(msg);
 	});
-	//connect to chat rtc
-	ChatInterface.joinChannel(chatId);
+	//connect to chat rtc (it will prepend type to chatID for us)
+	rtc.joinChannel(chatId, "chat");
 }
 
 function updateChat(msg) {
@@ -135,7 +139,7 @@ function storeChat(msg, chatId) {
 	//TODO THIS IS KINDA BLOATED
 
 	//adds message to respective chat and stores it
-	const key = `chat_${chatId}`;
+	const key = chatId;
 	let messages = [];
 	try {
 		const existing = localStorage.getItem(key);
@@ -258,7 +262,7 @@ async function selectServerItem(e) {
 			privServer.password !== null &&
 			privServer.password !== undefined
 		) {
-			let hash = await digestPwd(`${privServer}:${privServer.password}`);
+			let hash = await hashbrown(`${privServer}:${privServer.password}`);
 			displayChat(hash);
 		} else {
 			console.log("Error finding Server password for ", selectedServer);
@@ -487,7 +491,7 @@ async function storePrefs() {
 }
 
 //hash password to hex str
-async function digestPwd(pwd) {
+async function hashbrown(pwd) {
 	const msgUint8 = new TextEncoder().encode(pwd); // encode as (utf-8) Uint8Array
 	const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgUint8); // hash the message
 	const hashArray = Array.from(new Uint8Array(hashBuffer)); // convert buffer to byte array

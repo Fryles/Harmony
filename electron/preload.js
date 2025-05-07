@@ -7,7 +7,7 @@
  * https://www.electronjs.org/docs/latest/tutorial/sandbox
  */
 const { contextBridge, ipcRenderer } = require("electron");
-
+var prefs;
 contextBridge.exposeInMainWorld("electronAPI", {
 	updatePrefs: (prefs) => ipcRenderer.send("update-prefs", prefs),
 	getPrefs: () => ipcRenderer.invoke("get-prefs"),
@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
 // load prefs here
 window.addEventListener("DOMContentLoaded", async () => {
-	let prefs = await ipcRenderer.invoke("get-prefs");
+	prefs = await ipcRenderer.invoke("get-prefs");
 	if (prefs == "") {
 		//no prefs.json
 		prefs = defaultPrefs();
@@ -26,7 +26,9 @@ window.addEventListener("DOMContentLoaded", async () => {
 		loadPrefs(prefs);
 		promptDevices();
 	} else {
-		//we already have prefs
+		//we already have prefs, attempt to update w/ connected devices
+
+		prefs = await autoUpdateDevices(prefs);
 		loadPrefs(prefs);
 	}
 });
@@ -88,7 +90,7 @@ function defaultPrefs() {
 		user: {
 			username: psuedoUser(uid),
 			userId: uid,
-			password: "",
+			password: "pleasechangethis",
 		},
 		servers: [
 			{

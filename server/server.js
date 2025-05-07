@@ -18,7 +18,8 @@ const io = socketio(server, { cors: {} });
 
 // AUTHENTICATION MIDDLEWARE
 io.use((socket, next) => {
-	const token = socket.handshake.auth.token; // check the auth token provided by the client upon connection
+	const token = socket.handshake.auth.token;
+	//TODO add lookups here to match userId and secret in DB
 	if (token === TOKEN) {
 		next();
 	} else {
@@ -74,10 +75,12 @@ io.on("connection", (socket) => {
 
 	socket.on("joinChannel", (chnl, old) => {
 		if (old) {
-			console.log(`${socket.id} leaving ${old} and joining ${chnl}`);
+			console.log(
+				`${socket.handshake.auth.userId} leaving ${old} and joining ${chnl}`
+			);
 			socket.leave(old);
 		} else {
-			console.log(`${socket.id} joining ${chnl}`);
+			console.log(`${socket.handshake.auth.userId} joining ${chnl}`);
 		}
 		socket.join(chnl);
 		const peersInChannel = [];
@@ -90,19 +93,27 @@ io.on("connection", (socket) => {
 		//tell new user what peers to start RTC negotiation with
 		socket.emit("peers", {
 			from: "server",
+			channel: chnl,
 			target: socket.id,
 			peers: peersInChannel,
 		});
-		// socket.to(chnl).emit("peers", {
-		// 	from: "server",
-		// 	target: "all",
-		// 	peers: peersInChannel,
-		// });
+	});
+
+	socket.on("leaveChannel", (chnl) => {
+		console.log(`${socket.handshake.auth.userId} leaving channel ${chnl}`);
+		socket.leave(chnl);
+		//send message to still connected channel members to cease connection w/ peer
+		socket.to(chnl).emit("peerLeave", {
+			from: "server",
+			target: chnl,
+			peer: socket.handshake.auth.userId,
+		});
 	});
 
 	socket.on("message", (channel, peerId, message) => {
 		// Check if the target peer is in the channel before sending the message
 		const targetPeer = connections[peerId];
+		message.channel = channel;
 		if (targetPeer) {
 			const targetSocket = io.sockets.sockets.get(targetPeer.socketId);
 			if (targetSocket && targetSocket.rooms.has(channel)) {
@@ -117,6 +128,9 @@ io.on("connection", (socket) => {
 
 	socket.on("directMessage", (message) => {
 		// Send message to a specific targeted peer
+		if (message === null || message === undefined) {
+			console.log(`Bad dm message`);
+		}
 		const { target } = message;
 		const targetPeer = connections[target];
 		if (targetPeer) {

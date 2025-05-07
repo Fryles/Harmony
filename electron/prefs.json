@@ -1,8 +1,8 @@
 {
   "user": {
-    "username": "Snek Goose",
-    "userId": "da15efc6-3841-408c-bed2-a573d99e33b3",
-    "password": ""
+    "username": "Lumpy Bunny",
+    "userId": "74031170-9d7a-4a11-ac03-15ef4790f7dc",
+    "password": "pleasechangethis"
   },
   "servers": [
     {
@@ -29,12 +29,28 @@
   ],
   "devices": {
     "videoInputDevices": [],
-    "audioInputDevices": [],
+    "audioInputDevices": [
+      {
+        "deviceId": "default",
+        "kind": "audioinput",
+        "label": "Default - Myle pods (Bluetooth)"
+      },
+      {
+        "deviceId": "adf1b2698ded844dd38ce591bece70345f9ce083098778a8f834d094394c6958",
+        "kind": "audioinput",
+        "label": "Myle pods (Bluetooth)"
+      }
+    ],
     "audioOutputDevices": [
       {
         "deviceId": "default",
         "kind": "audiooutput",
-        "label": "Default - Mac mini Speakers (Built-in)"
+        "label": "Default - Myle pods (Bluetooth)"
+      },
+      {
+        "deviceId": "74d3fbc1b8fd13c66557e0c4e8e96fbb86c78c5aec9bbfcdc7df632944081459",
+        "kind": "audiooutput",
+        "label": "Myle pods (Bluetooth)"
       },
       {
         "deviceId": "8c9f8879e73bbe41a62d6b46974c8207e5f5f195a7a027f6c4cb34ffe2301d19",
@@ -52,10 +68,15 @@
         "label": "Mac mini Speakers (Built-in)"
       }
     ],
+    "audioInputDevice": {
+      "deviceId": "default",
+      "kind": "audioinput",
+      "label": "Default - Myle pods (Bluetooth)"
+    },
     "audioOutputDevice": {
       "deviceId": "default",
       "kind": "audiooutput",
-      "label": "Default - Mac mini Speakers (Built-in)"
+      "label": "Default - Myle pods (Bluetooth)"
     }
   },
   "audio": {
