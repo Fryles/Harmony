@@ -57,15 +57,16 @@ async function main() {
 		div.addEventListener("click", selectFriend, true);
 	});
 
-	// document
-	// 	.getElementById("voice-mute")
-	// 	.addEventListener("click", RTC.voiceMute);
-	// document
-	// 	.getElementById("voice-call")
-	// 	.addEventListener("click", RTC.startVoiceCall);
+	document
+		.getElementById("voice-mute")
+		.addEventListener("click", rtc.voiceMute);
+	document
+		.getElementById("voice-call")
+		.addEventListener("click", rtc.voiceRing(currentChat));
 }
 
 function sendChat(content) {
+	content = DOMPurify.sanitize(content);
 	//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM CURRENTCHAT
 	const msg = {
 		timestamp: Date.now(),
@@ -79,7 +80,6 @@ function sendChat(content) {
 }
 
 function rcvChat(msg) {
-	msg = JSON.parse(msg);
 	channel = msg.channel;
 	if (channel == currentChat) {
 		updateChat(msg);

@@ -4,6 +4,7 @@ class rtcInterface {
 	constructor() {
 		this.signalingChannel = null; //channel we are currently signaling on
 		//This is only changed for new connections
+		this.mediaChannel = null; //channel for video/voice
 		this.peerConnections = {};
 		this.remoteAudioStreams = {};
 		this.dataChannels = {};
@@ -58,6 +59,21 @@ class rtcInterface {
 		this.socket.on("uniquenessError", (e) => {
 			console.log(e);
 		});
+	}
+
+	voiceMute() {
+		let e = document.getElementById("voice-mute").querySelector("i");
+		e.classList.toggle("fa-microphone");
+		e.classList.toggle("fa-microphone-slash");
+		if (this.localAudioStream) {
+			this.localAudioStream.getAudioTracks().forEach((track) => {
+				track.enabled = !e.classList.contains("fa-microphone-slash");
+			});
+		}
+	}
+
+	voiceRing(channel) {
+		//Use established chat: channel passed to send a vc request
 	}
 
 	async _initLocalAudio() {
@@ -131,8 +147,8 @@ class rtcInterface {
 				}
 			});
 		}
+		this.signalingChannel = newChannel; //set signalingchannel before we start connection process
 		this.socket.emit("joinChannel", newChannel);
-		this.signalingChannel = newChannel;
 		console.log("joined ", this.signalingChannel);
 	}
 
@@ -305,14 +321,19 @@ class rtcInterface {
 			}
 		};
 		dc.onmessage = (event) => {
+			event = JSON.parse(event.data);
 			//bad overhead using parse for a log
 			console.log(
-				`Received message from ${peerId} on channel ${
-					JSON.parse(event.data).channel
-				}:`,
-				event.data
+				`Received message from ${peerId} on channel ${event.channel}:`,
+				event.content
 			);
-			window.rcvChat(event.data, peerId);
+			if (event.voiceRing) {
+				//special param for starting vc, display ring/voice ui
+			} else if (event.videoRing) {
+				//special param for starting vc, display ring/video ui
+			} else {
+				window.rcvChat(event, peerId);
+			}
 		};
 	}
 
