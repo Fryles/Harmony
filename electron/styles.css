@@ -87,11 +87,84 @@ html {
 	z-index: 5;
 	border-radius: 25px;
 }
-
+.voice-area.ringing {
+	animation: pulse-incoming 1s infinite;
+	box-shadow: 0 0 0 0 rgba(50, 205, 50, 0.7);
+}
+@keyframes pulse-incoming {
+	0% {
+		transform: scale(1);
+		box-shadow: 0 0 0 0 rgba(50, 205, 50, 0.7);
+	}
+	70% {
+		transform: scale(1.08);
+		box-shadow: 0 0 0 12px rgba(50, 205, 50, 0);
+	}
+	100% {
+		transform: scale(1);
+		box-shadow: 0 0 0 0 rgba(50, 205, 50, 0);
+	}
+}
 .voice-ico {
 	width: 50px;
 	height: 50px;
 	margin-bottom: 10px;
+	transition: all 0.3s ease;
+	border-radius: 25px;
+}
+
+@keyframes wiggle-ring {
+	0% {
+		transform: scale(1) rotate(0deg);
+	}
+	10% {
+		transform: scale(1.08) rotate(-10deg);
+	}
+	20% {
+		transform: scale(1.12) rotate(10deg);
+	}
+	30% {
+		transform: scale(1.1) rotate(-8deg);
+	}
+	40% {
+		transform: scale(1.12) rotate(8deg);
+	}
+	50% {
+		transform: scale(1.1) rotate(-6deg);
+	}
+	60% {
+		transform: scale(1.12) rotate(6deg);
+	}
+	70% {
+		transform: scale(1.1) rotate(-4deg);
+	}
+	80% {
+		transform: scale(1.08) rotate(4deg);
+	}
+	90% {
+		transform: scale(1.05) rotate(-2deg);
+	}
+	100% {
+		transform: scale(1) rotate(0deg);
+	}
+}
+
+#voice-call.ringing {
+	animation: wiggle-ring 0.7s infinite;
+}
+
+.voice-ico:hover {
+	transform: scale(1.1);
+	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+	background-color: hsl(240, 2%, 36%);
+	color: var(--bulma-success) !important;
+}
+
+#voice-call.ringing:hover {
+	color: var(--bulma-danger) !important;
+}
+#voice-call.ringing.pickup:hover {
+	color: var(--bulma-success-light) !important;
 }
 
 .voice-prof {

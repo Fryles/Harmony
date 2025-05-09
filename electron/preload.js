@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	updatePrefs: (prefs) => ipcRenderer.send("update-prefs", prefs),
 	getPrefs: () => ipcRenderer.invoke("get-prefs"),
 	loadPrefs: (prefs) => loadPrefs(prefs),
+	getPsuedoUser: (userId) => psuedoUser(userId),
 });
 
 // load prefs here
@@ -103,6 +104,7 @@ function defaultPrefs() {
 			theme: "dark",
 			accentColor: "#856bf9",
 			language: "en-US",
+			ringVolume: 0.5,
 			notifications: true,
 			checkUpdate: true,
 			maxMsgHistory: 50,

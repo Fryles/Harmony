@@ -62,7 +62,7 @@ async function main() {
 		.addEventListener("click", rtc.voiceMute);
 	document
 		.getElementById("voice-call")
-		.addEventListener("click", rtc.voiceRing(currentChat));
+		.addEventListener("click", () => rtc.callVoice(currentChat));
 }
 
 function sendChat(content) {
@@ -76,7 +76,7 @@ function sendChat(content) {
 	};
 	updateChat(msg);
 	storeChat(msg, currentChat);
-	rtc.sendMessage(msg);
+	rtc.sendMessage(msg, currentChat);
 }
 
 function rcvChat(msg) {
@@ -90,10 +90,9 @@ function rcvChat(msg) {
 function displayChat(chatId) {
 	//get messages from browser
 	currentChat = `chat:${chatId}`;
-	const key = `chat:${chatId}`;
 	var messages = [];
 	try {
-		const existing = localStorage.getItem(key);
+		const existing = localStorage.getItem(currentChat);
 		if (existing) {
 			messages = JSON.parse(existing);
 		}
@@ -107,7 +106,7 @@ function displayChat(chatId) {
 		updateChat(msg);
 	});
 	//connect to chat rtc (it will prepend type to chatID for us)
-	rtc.joinChannel(chatId, "chat");
+	rtc.joinChannel(currentChat);
 }
 
 function updateChat(msg) {
@@ -272,7 +271,7 @@ async function selectServerItem(e) {
 
 function userLookup(userId) {
 	if (!localPrefs || !localPrefs.friends)
-		return { name: psuedoUser(userId), nick: "" };
+		return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 	if (userId === localPrefs.user.userId) {
 		return { name: localPrefs.user.username, nick: "" };
 	}
@@ -280,157 +279,7 @@ function userLookup(userId) {
 	if (friend) {
 		return { name: friend.name, nick: friend.nick || "" };
 	}
-	return { name: psuedoUser(userId), nick: "" };
-}
-
-function psuedoUser(userId) {
-	//if we cant find a username, we give a unique readable one based on uuuid
-	var prefixes = [
-		"Cool",
-		"Epic",
-		"Funky",
-		"Sneaky",
-		"Wobbly",
-		"Spicy",
-		"Quantum",
-		"Fluffy",
-		"Turbo",
-		"Mega",
-		"Ultra",
-		"Dank",
-		"Silly",
-		"Chill",
-		"Radical",
-		"Bizarre",
-		"Cosmic",
-		"Tiny",
-		"Giga",
-		"Sleepy",
-		"Noisy",
-		"Silent",
-		"Cheesy",
-		"Cranky",
-		"Jumpy",
-		"Loopy",
-		"Wonky",
-		"Zippy",
-		"Groovy",
-		"Moist",
-		"Chunky",
-		"Soggy",
-		"Yeet",
-		"Boaty",
-		"Saucy",
-		"Snazzy",
-		"Lumpy",
-		"Derpy",
-		"Swole",
-		"Toasty",
-		"Spooky",
-		"Bouncy",
-		"Goofy",
-		"Lazy",
-		"Nerdy",
-		"Feral",
-		"Crusty",
-		"Frosty",
-		"Salty",
-		"Sweaty",
-		"Thicc",
-		"Sussy",
-		"Drippy",
-		"Wacky",
-		"Borked",
-		"Dopey",
-		"Zonky",
-		"Yolo",
-		"Vibey",
-		"Breezy",
-		"Dizzy",
-		"Meme",
-		"Pog",
-		"Blep",
-		"Snek",
-	];
-	var suffixes = [
-		"Cat",
-		"Dog",
-		"Monkey",
-		"Fox",
-		"Bear",
-		"Otter",
-		"Penguin",
-		"Bunny",
-		"Lion",
-		"Tiger",
-		"Wolf",
-		"Duck",
-		"Goose",
-		"Moose",
-		"Horse",
-		"Ferret",
-		"Whale",
-		"Mouse",
-		"Elephant",
-		"Koala",
-		"Parrot",
-		"Hawk",
-		"Sheep",
-		"Goat",
-		"Frog",
-		"Lizard",
-		"Snake",
-		"Zebra",
-		"Giraffe",
-		"Moose",
-		"Rhino",
-		"Hippo",
-		"Fish",
-		"Boat",
-		"Crab",
-		"Bee",
-		"Bat",
-		"Goose",
-		"Ox",
-		"Goat",
-		"Ghost",
-		"Kangaroo",
-		"Cow",
-		"Moose",
-		"Owl",
-		"Rat",
-		"Cat",
-		"Penguin",
-		"Seal",
-		"Shark",
-		"Duck",
-		"Imp",
-		"Crow",
-		"Worm",
-		"Dog",
-		"Sloth",
-		"Yak",
-		"Mole",
-		"Vole",
-		"Ant",
-		"Dove",
-		"Moth",
-		"Pug",
-		"Snake",
-	];
-	// Simple hash to pick a prefix and suffix based on userId
-	function hashCode(str) {
-		let hash = 0;
-		for (let i = 0; i < str.length; i++) {
-			hash = (hash << prefixes.length) - hash + str.charCodeAt(i);
-			hash |= 0;
-		}
-		return Math.abs(hash);
-	}
-	const hash = hashCode(userId);
-	const prefix = prefixes[hash % prefixes.length];
-	const suffix = suffixes[hash % suffixes.length];
-	return `${prefix} ${suffix}`;
+	return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 }
 
 async function storePrefs() {

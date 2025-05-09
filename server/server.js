@@ -90,23 +90,31 @@ io.on("connection", (socket) => {
 				peersInChannel.push(peerId);
 			}
 		}
+		const newPeer = socket.handshake.auth.userId;
 		//tell new user what peers to start RTC negotiation with
-		socket.emit("peers", {
+		socket.emit("welcome", {
 			from: "server",
 			channel: chnl,
 			target: socket.id,
 			peers: peersInChannel,
 		});
+		//Tell existing peers about new peer
+		socket.to(chnl).emit("peerJoin", {
+			from: newPeer,
+			channel: chnl,
+			target: chnl,
+		});
 	});
 
 	socket.on("leaveChannel", (chnl) => {
 		console.log(`${socket.handshake.auth.userId} leaving channel ${chnl}`);
+		const leftPeer = socket.handshake.auth.userId;
 		socket.leave(chnl);
 		//send message to still connected channel members to cease connection w/ peer
 		socket.to(chnl).emit("peerLeave", {
-			from: "server",
+			from: leftPeer,
+			channel: chnl,
 			target: chnl,
-			peer: socket.handshake.auth.userId,
 		});
 	});
 
@@ -151,6 +159,20 @@ io.on("connection", (socket) => {
 				"with peerId",
 				disconnectingPeer.peerId
 			);
+
+			// Emit peerLeave for each channel the peer is part of
+			const socketRooms = socket.rooms;
+			// socket.rooms is a Set including the socket.id itself, so skip that
+			for (const room of socketRooms) {
+				if (room !== socket.id) {
+					socket.to(room).emit("peerLeave", {
+						from: disconnectingPeer.peerId,
+						channel: room,
+						target: room,
+					});
+				}
+			}
+
 			// Make all peers close their peer channels
 			socket.broadcast.emit("message", {
 				from: disconnectingPeer.peerId,
