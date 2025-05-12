@@ -24,6 +24,11 @@ class rtcInterface {
 		this.socket.on("welcome", (data) => {
 			//ran after we join a new channel
 			console.log("Welcome: ", data);
+
+			if (this.signalingChannel != data.channel) {
+				console.warn("Got welcome on channel we are not signaling on???");
+			}
+
 			data.peers = data.peers.filter((peerId) => peerId !== selfId);
 			// Extract type from data.channel (format: "type:channelName")
 			const [type] = data.channel ? data.channel.split(":") : [null];
@@ -33,7 +38,6 @@ class rtcInterface {
 				this.voiceRing(data.channel);
 				return;
 			}
-
 			data.peers.forEach((peerId) => {
 				if (type == "voice") {
 					this.startVoiceConnection(peerId);
@@ -91,9 +95,6 @@ class rtcInterface {
 			//if voice channel, remove from ui
 
 			const [type] = data.channel ? data.channel.split(":") : [null];
-
-			console.log(type);
-
 			if (type === "voice") {
 				removeVoiceUser(data.from);
 			}
@@ -338,13 +339,13 @@ class rtcInterface {
 
 	joinChannel(newChannel) {
 		// Validate newChannel (format: type:base)
-		if (newChannel === null || newChannel === undefined) {
+		if (
+			newChannel === null ||
+			newChannel === undefined ||
+			typeof newChannel !== "string"
+		) {
 			console.error("bad channel");
-			return;
-		}
-		if (typeof newChannel !== "string") {
 			console.error("Channel must be a string");
-			console.log(newChannel);
 			return;
 		}
 		const [type, base] = newChannel.split(":");
@@ -362,6 +363,7 @@ class rtcInterface {
 		}
 		if (newChannel == this.mediaChannel) {
 			//joining same channel, do nothing.
+			console.log("attempted to join mediaChannel again");
 			return;
 		}
 		// if joining a voice/video channel, stop all stream connections to any voice/video channels
@@ -389,51 +391,64 @@ class rtcInterface {
 	}
 
 	startVoiceConnection(peerId) {
-		const pc = new RTCPeerConnection(this.rtcConfig);
+		const pc = this.peerConnections[peerId];
+		if (!pc) {
+			console.error("No existing peer connection to start voice from...");
+			return;
+		}
 		// Add channels property as an array to track channel membership
 		pc.channels = pc.channels || [];
 		if (!pc.channels.includes(this.signalingChannel)) {
 			pc.channels.push(this.signalingChannel);
 		}
-		this.peerConnections[peerId] = pc;
-
-		// Add local audio tracks to the connection
+		// If we already have a remote audio stream for this peer, don't add again
+		if (this.remoteAudioStreams[peerId]) {
+			console.log("Voice - Attempted to connect to existing peer");
+			return;
+		}
+		// Add local audio tracks to the existing connection (if not already present)
 		if (this.localAudioStream) {
+			const senders = pc.getSenders();
 			this.localAudioStream.getTracks().forEach((track) => {
-				pc.addTrack(track, this.localAudioStream);
+				const alreadyAdded = senders.some(
+					(sender) => sender.track && sender.track.id === track.id
+				);
+				if (!alreadyAdded) {
+					pc.addTrack(track, this.localAudioStream);
+					console.log("Added local track to peer connection");
+				}
 			});
 		} else {
 			console.warn("No local audio when joining voice connection");
 		}
 
 		pc.ontrack = (event) => {
+			console.log("recieved remote track");
 			this.remoteAudioStreams[peerId] = event.streams[0];
 			this._playRemoteAudio(peerId, event.streams[0]);
-			// Optionally, visualize remote audio:
-			attachAudioVisualizer(this.remoteAudioStreams[peerId]);
 		};
 
-		pc.onicecandidate = (event) => {
-			if (event.candidate) {
-				this.sendSignalingMessage(this.signalingChannel, peerId, {
-					type: "candidate",
-					candidate: event.candidate,
-				});
-			}
-		};
-
-		// Create and send an SDP offer to start the voice RTC connection
-		pc.createOffer({ offerToReceiveAudio: true })
-			.then((offer) => pc.setLocalDescription(offer))
-			.then(() => {
+		pc.onnegotiationneeded = async () => {
+			try {
+				const offer = await pc.createOffer({ offerToReceiveAudio: true });
+				await pc.setLocalDescription(offer);
 				this.sendSignalingMessage(this.signalingChannel, peerId, {
 					type: "offer",
 					offer: pc.localDescription,
 				});
-			});
+			} catch (err) {
+				console.error("Negotiation error:", err);
+			}
+		};
 	}
 
 	startChatConnection(peerId) {
+		if (this.dataChannels[peerId]) {
+			//already have dataChannel connection... return
+			console.log("Chat - Attempted to connect to existing peer");
+			return;
+		}
+
 		const pc = this.peerConnections[peerId]
 			? this.peerConnections[peerId]
 			: new RTCPeerConnection(this.rtcConfig);
@@ -442,13 +457,9 @@ class rtcInterface {
 		if (!pc.channels.includes(this.signalingChannel)) {
 			pc.channels.push(this.signalingChannel);
 		}
+
 		if (!this.peerConnections[peerId]) {
 			this.peerConnections[peerId] = pc;
-		}
-		if (this.dataChannels[peerId]) {
-			//already have dataChannel connection... return
-			console.log("Chat - Attempted to connect to existing peer");
-			return;
 		}
 
 		console.log("Chat - Connecting to: ", peerId);
@@ -506,12 +517,12 @@ class rtcInterface {
 					pc.channels = pc.channels.filter((ch) => ch !== dcChannel);
 				}
 				// If no channels left, close and remove the peer connection
-				if (!pc.channels || pc.channels.length === 0) {
-					if (pc.signalingState !== "closed") {
-						pc.close();
-					}
-					delete this.peerConnections[peerId];
-				}
+				// if (!pc.channels || pc.channels.length === 0) {
+				// 	if (pc.signalingState !== "closed") {
+				// 		pc.close();
+				// 	}
+				// 	delete this.peerConnections[peerId];
+				// }
 			}
 			if (this.dataChannels[peerId]) {
 				delete this.dataChannels[peerId];
@@ -554,19 +565,30 @@ class rtcInterface {
 	}
 
 	handleOffer(peerId, offer) {
-		const pc = new RTCPeerConnection(this.rtcConfig);
+		const pc = this.peerConnections[peerId]
+			? this.peerConnections[peerId]
+			: new RTCPeerConnection(this.rtcConfig);
 		// Add channels property as an array to track channel membership
 		pc.channels = pc.channels || [];
 		if (!pc.channels.includes(this.signalingChannel)) {
 			pc.channels.push(this.signalingChannel);
 		}
-		this.peerConnections[peerId] = pc;
+		if (!this.peerConnections[peerId]) {
+			this.peerConnections[peerId] = pc;
+		}
 
 		// If the offer is for audio (voice), add local audio tracks
 		if (offer.sdp && offer.sdp.includes("m=audio")) {
 			if (this.localAudioStream) {
+				const senders = pc.getSenders();
 				this.localAudioStream.getTracks().forEach((track) => {
-					pc.addTrack(track, this.localAudioStream);
+					const alreadyAdded = senders.some(
+						(sender) => sender.track && sender.track.id === track.id
+					);
+					if (!alreadyAdded) {
+						pc.addTrack(track, this.localAudioStream);
+						console.log("Added local track to peer connection");
+					}
 				});
 			} else {
 				console.warn("No local audio when handling voice offer");
@@ -579,10 +601,9 @@ class rtcInterface {
 		};
 
 		pc.ontrack = (event) => {
+			console.log("recieved remote track");
 			this.remoteAudioStreams[peerId] = event.streams[0];
 			this._playRemoteAudio(peerId, event.streams[0]);
-			// Optionally, visualize remote audio:
-			attachAudioVisualizer(this.remoteAudioStreams[peerId]);
 		};
 
 		pc.onicecandidate = (event) => {
@@ -629,6 +650,8 @@ class rtcInterface {
 			audioElem.style.display = "none";
 			document.body.appendChild(audioElem);
 		}
+		attachAudioVisualizer(stream);
+		visualizeBorderWithAudio(stream, peerId);
 		audioElem.srcObject = stream;
 	}
 
