@@ -94,6 +94,44 @@
 
     </div>
   </div>
+
+  <!-- Friends Modal -->
+  <div class="modal" id="friendreq-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+      <header class="modal-card-head has-background-primary-soft has-text-primary-soft-invert py-4">
+        <p class="modal-card-title">Add Friend</p>
+        <button class="delete is-large" aria-label="close"></button>
+      </header>
+      <section class="modal-card-body">
+        <div class="field">
+          <label class="label">Friend's ID</label>
+          <div class="control">
+            <input class="input" type="text" id="friendIdInput" placeholder="Enter friend's ID">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Friend's Name</label>
+          <div class="control">
+            <input class="input" type="text" id="friendNameInput" placeholder="Enter friend's name">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Secret</label>
+          <div class="control">
+            <input class="input" id="friendChatInput" placeholder="Nae nae baby">
+          </div>
+        </div>
+      </section>
+      <footer class="modal-card-foot">
+        <div class="buttons">
+          <button class="button is-primary" id="add-friend-confirm">Add Friend</button>
+          <button class="button" id="add-friend-cancel">Cancel</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
   <!-- Settings Modal -->
   <div class="modal" id="settings-modal">
     <div class="modal-background"></div>

@@ -65,6 +65,8 @@ async function main() {
 		.addEventListener("click", () => rtc.callVoice(currentChat));
 }
 
+function sendFriendReq(userId) {}
+
 function sendChat(content) {
 	content = DOMPurify.sanitize(content);
 	//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM CURRENTCHAT

@@ -650,7 +650,7 @@ class rtcInterface {
 			audioElem.style.display = "none";
 			document.body.appendChild(audioElem);
 		}
-		attachAudioVisualizer(stream);
+		// attachAudioVisualizer(stream);
 		visualizeBorderWithAudio(stream, peerId);
 		audioElem.srcObject = stream;
 	}
@@ -680,6 +680,9 @@ class rtcInterface {
 			console.error("Could not get local audio:", err);
 		}
 	}
+
+
+
 }
 
 function setChannelType(channel, type) {

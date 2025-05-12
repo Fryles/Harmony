@@ -139,7 +139,7 @@ io.on("connection", (socket) => {
 		if (message === null || message === undefined) {
 			console.log(`Bad dm message`);
 		}
-		const { target } = message;
+		const { target } = message.to;
 		const targetPeer = connections[target];
 		if (targetPeer) {
 			io.to(targetPeer.socketId).emit("message", { ...message });
