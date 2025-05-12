@@ -24,8 +24,7 @@ class rtcInterface {
 		this.socket.on("welcome", (data) => {
 			//ran after we join a new channel
 			console.log("Welcome: ", data);
-			data.peers = data.peers.filter((peerId) => peerId !== userId);
-
+			data.peers = data.peers.filter((peerId) => peerId !== selfId);
 			// Extract type from data.channel (format: "type:channelName")
 			const [type] = data.channel ? data.channel.split(":") : [null];
 			//if type is a voice or video channel, check for peer count
@@ -136,7 +135,7 @@ class rtcInterface {
 			//TODO add case for video
 		} else if (this.ring && this.ring.type == "incoming voice") {
 			// Incoming ring, pick up
-			this.voiceJoin(this.ring);
+			this.voiceJoin(this.ring.channel);
 			return;
 		} else {
 			// Not in a call, not ringing, start/join voice channel
@@ -185,14 +184,14 @@ class rtcInterface {
 			this.voiceRingEnd(); //stop ring if we are ending it early
 			this.ring = null;
 		}
-		removeVoiceUser(userId);
+		removeVoiceUser(selfId);
 		document.getElementById("voice-call").classList.remove("pickup");
 		document.getElementById("voice-call").classList.add("has-text-primary");
 		document.getElementById("voice-call").classList.remove("has-text-danger");
 		//send courtesy dataChannel message to remove yourself for any chat only peers
 		const msg = {
 			timestamp: Date.now(),
-			user: userId,
+			user: selfId,
 			content: "",
 			channel: this.mediaChannel,
 			type: "voiceLeave",
@@ -209,6 +208,7 @@ class rtcInterface {
 			this.ring.audio.pause();
 			this.ring.audio.currentTime = 0;
 			this.ring.audio = null;
+			clearTimeout(this.ring.timeout);
 			this.ring = null;
 		}
 		if (toRemove) {
@@ -219,16 +219,13 @@ class rtcInterface {
 		document.getElementById("voice-call").classList.remove("ringing");
 	}
 
-	voiceJoin(channel) {
+	async voiceJoin(channel) {
 		if (!this.localAudioStream) {
-			this._initLocalAudio();
+			await this._initLocalAudio();
 		}
 		if (this.ring && this.ring.type == "incoming voice") {
 			//stop any existing incoming ring
-			this.ring.audio.pause();
-			this.ring.audio.currentTime = 0;
-			channel = this.ring.channel;
-			this.ring = null;
+			this.voiceRingEnd();
 		}
 		//change color of call button and stop anims
 		document.getElementById("voice-list").classList.remove("ringing");
@@ -237,7 +234,7 @@ class rtcInterface {
 		document.getElementById("voice-call").classList.remove("has-text-primary");
 		document.getElementById("voice-call").classList.add("has-text-danger");
 		//add ourselves to ui
-		addVoiceUser(userId);
+		addVoiceUser(selfId);
 		this.joinChannel(channel);
 	}
 
@@ -270,7 +267,7 @@ class rtcInterface {
 		}
 		const msg = {
 			timestamp: Date.now(),
-			user: userId,
+			user: selfId,
 			content: "",
 			channel: channel,
 			type: "voiceRing",
@@ -280,7 +277,7 @@ class rtcInterface {
 		this.ring = {
 			type: "outgoing voice",
 			audio: new Audio("ring.m4a"),
-			from: userId,
+			from: selfId,
 			channel: channel,
 		};
 		this.ring.audio.loop = true;
@@ -293,7 +290,7 @@ class rtcInterface {
 		document.getElementById("voice-list").classList.add("ringing");
 		document.getElementById("voice-call").classList.add("ringing");
 		//set timeout for ring end
-		setTimeout(() => {
+		this.ring.timeout = setTimeout(() => {
 			if (this.ring) {
 				this.voiceRingEnd();
 			}
@@ -332,7 +329,7 @@ class rtcInterface {
 		document.getElementById("voice-call").classList.add("pickup");
 		addVoiceUser(msg.user);
 		//set timeout for ring end
-		setTimeout(() => {
+		this.ring.timeout = setTimeout(() => {
 			if (this.ring && this.mediaChannel != this.ring.channel) {
 				this.voiceRingEnd();
 			}
@@ -347,6 +344,7 @@ class rtcInterface {
 		}
 		if (typeof newChannel !== "string") {
 			console.error("Channel must be a string");
+			console.log(newChannel);
 			return;
 		}
 		const [type, base] = newChannel.split(":");
@@ -404,11 +402,15 @@ class rtcInterface {
 			this.localAudioStream.getTracks().forEach((track) => {
 				pc.addTrack(track, this.localAudioStream);
 			});
+		} else {
+			console.warn("No local audio when joining voice connection");
 		}
 
 		pc.ontrack = (event) => {
 			this.remoteAudioStreams[peerId] = event.streams[0];
 			this._playRemoteAudio(peerId, event.streams[0]);
+			// Optionally, visualize remote audio:
+			attachAudioVisualizer(this.remoteAudioStreams[peerId]);
 		};
 
 		pc.onicecandidate = (event) => {
@@ -420,7 +422,8 @@ class rtcInterface {
 			}
 		};
 
-		pc.createOffer()
+		// Create and send an SDP offer to start the voice RTC connection
+		pc.createOffer({ offerToReceiveAudio: true })
 			.then((offer) => pc.setLocalDescription(offer))
 			.then(() => {
 				this.sendSignalingMessage(this.signalingChannel, peerId, {
@@ -476,7 +479,7 @@ class rtcInterface {
 		//send message to peers in specified channel
 		Object.keys(this.peerConnections).forEach((peerId) => {
 			if (
-				peerId !== userId &&
+				peerId !== selfId &&
 				this.peerConnections[peerId].channels &&
 				this.peerConnections[peerId].channels.includes(channel)
 			) {
@@ -526,7 +529,7 @@ class rtcInterface {
 					this.gotRing(event);
 					break;
 				case "voiceLeave":
-					if (this.ring.channel == event.channel) {
+					if (this.ring && this.ring.channel == event.channel) {
 						//voiceLeave on a ringing channel. Assume hangup
 						this.voiceRingEnd(event.user);
 					} else {
@@ -544,7 +547,7 @@ class rtcInterface {
 
 	sendSignalingMessage(channel, peerId, msg) {
 		this.socket.emit("message", channel, peerId, {
-			from: userId,
+			from: selfId,
 			target: peerId,
 			msg,
 		});
@@ -559,9 +562,27 @@ class rtcInterface {
 		}
 		this.peerConnections[peerId] = pc;
 
+		// If the offer is for audio (voice), add local audio tracks
+		if (offer.sdp && offer.sdp.includes("m=audio")) {
+			if (this.localAudioStream) {
+				this.localAudioStream.getTracks().forEach((track) => {
+					pc.addTrack(track, this.localAudioStream);
+				});
+			} else {
+				console.warn("No local audio when handling voice offer");
+			}
+		}
+
 		pc.ondatachannel = (event) => {
 			this.dataChannels[peerId] = event.channel;
 			this.setupDataChannel(peerId, event.channel);
+		};
+
+		pc.ontrack = (event) => {
+			this.remoteAudioStreams[peerId] = event.streams[0];
+			this._playRemoteAudio(peerId, event.streams[0]);
+			// Optionally, visualize remote audio:
+			attachAudioVisualizer(this.remoteAudioStreams[peerId]);
 		};
 
 		pc.onicecandidate = (event) => {
@@ -598,6 +619,19 @@ class rtcInterface {
 		}
 	}
 
+	_playRemoteAudio(peerId, stream) {
+		// Create or reuse an <audio> element for this peer
+		let audioElem = document.getElementById(`remote-audio-${peerId}`);
+		if (!audioElem) {
+			audioElem = document.createElement("audio");
+			audioElem.id = `remote-audio-${peerId}`;
+			audioElem.autoplay = true;
+			audioElem.style.display = "none";
+			document.body.appendChild(audioElem);
+		}
+		audioElem.srcObject = stream;
+	}
+
 	async _initLocalAudio() {
 		try {
 			// Try to get the preferred audio input device from prefs.json (if available)
@@ -605,7 +639,7 @@ class rtcInterface {
 			if (localPrefs && localPrefs.devices.audioInputDevice) {
 				const audioInputDevices = localPrefs.devices.audioInputDevices;
 				const preferredDevice = localPrefs.devices.audioInputDevice
-					? localPrefs.devices.audioInputDevices.deviceId
+					? localPrefs.devices.audioInputDevice.deviceId
 					: audioInputDevices[0].deviceId; // Use the first device as preferred
 				deviceId = preferredDevice;
 			} else {
@@ -658,6 +692,8 @@ function addVoiceUser(userId) {
 	voiceUser.id = userId;
 	voiceUser.onclick = function (e) {};
 	document.getElementById("voice-list").appendChild(voiceUser);
+	//add talking animation
+	if (userId == selfId) visualizeBorderWithAudio(rtc.localAudioStream, userId);
 }
 function removeVoiceUser(userId) {
 	const voiceUser = document.getElementById(userId);

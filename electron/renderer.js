@@ -3,7 +3,7 @@ var selectedServer = "HARMONY-FRIENDS-LIST";
 var selectedFriend;
 var currentChat;
 var localPrefs;
-var userId;
+var selfId;
 var userSecret;
 
 //TODO move secret out of frontend probably
@@ -12,16 +12,16 @@ main();
 async function main() {
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
-	userId = crypto.randomUUID(); //localPrefs.user.userId
+	selfId = crypto.randomUUID(); //localPrefs.user.userId
 	// Hash userId with password to create a secret
-	userSecret = await hashbrown(`${userId}:${localPrefs.user.password}`);
+	userSecret = await hashbrown(`${selfId}:${localPrefs.user.password}`);
 	console.log("Secret: ", userSecret);
 
 	//init websocket
 	window.socket = io("ws://localhost:3030", {
-		auth: { token: "SIGNALING123", userId: userId, secret: userSecret },
+		auth: { token: "SIGNALING123", userId: selfId, secret: userSecret },
 	});
-	this.socket.emit("ready", userId);
+	this.socket.emit("ready", selfId);
 	//init chat and voice interfaces
 	rtc = new rtcInterface();
 	// VoiceInterface = new rtcVoice();
@@ -70,7 +70,7 @@ function sendChat(content) {
 	//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM CURRENTCHAT
 	const msg = {
 		timestamp: Date.now(),
-		user: userId,
+		user: selfId,
 		content: content,
 		channel: currentChat,
 	};
@@ -119,7 +119,7 @@ function updateChat(msg) {
 	let el = document.createElement("p");
 	let un = document.createElement("span");
 	un.className = "tag";
-	if (msg.user == userId) {
+	if (msg.user == selfId) {
 		un.classList.add("is-primary");
 		el.style = "text-align: end;";
 	}
