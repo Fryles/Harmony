@@ -16,6 +16,7 @@ class rtcInterface {
 		this.ring = null;
 		this.ringTimeout = 10000;
 		this._lastCallVoice = 0;
+		this.inputGainValue = localPrefs.audio.inputGain;
 
 		this._registerSocketEvents();
 	}
@@ -187,6 +188,7 @@ class rtcInterface {
 		}
 		removeVoiceUser(selfId);
 		document.getElementById("voice-call").classList.remove("pickup");
+		document.getElementById("voice-call").classList.remove("danger");
 		document.getElementById("voice-call").classList.add("has-text-primary");
 		document.getElementById("voice-call").classList.remove("has-text-danger");
 		//send courtesy dataChannel message to remove yourself for any chat only peers
@@ -234,6 +236,7 @@ class rtcInterface {
 		document.getElementById("voice-call").classList.remove("pickup");
 		document.getElementById("voice-call").classList.remove("has-text-primary");
 		document.getElementById("voice-call").classList.add("has-text-danger");
+		document.getElementById("voice-call").classList.add("danger");
 		//add ourselves to ui
 		addVoiceUser(selfId);
 		this.joinChannel(channel);
@@ -282,8 +285,8 @@ class rtcInterface {
 			channel: channel,
 		};
 		this.ring.audio.loop = true;
-		this.ring.audio.volume = localPrefs.settings.ringVolume
-			? localPrefs.settings.ringVolume
+		this.ring.audio.volume = localPrefs.audio.ringVolume
+			? localPrefs.audio.ringVolume
 			: 0.7;
 		this.ring.audio.play();
 		//add ourselves to the ui and play anims
@@ -320,8 +323,8 @@ class rtcInterface {
 			//already in a vc, handle later
 		}
 		this.ring.audio.loop = true;
-		this.ring.audio.volume = localPrefs.settings.ringVolume
-			? localPrefs.settings.ringVolume
+		this.ring.audio.volume = localPrefs.audio.ringVolume
+			? localPrefs.audio.ringVolume
 			: 0.7;
 		this.ring.audio.play();
 		//add our caller to the ui and play anims
@@ -545,6 +548,11 @@ class rtcInterface {
 						this.voiceRingEnd(event.user);
 					} else {
 						//remove from ui & channel
+						removeVoiceUser(event.user);
+						const pc = this.peerConnections[event.user];
+						if (pc.channels) {
+							pc.channels = pc.channels.filter((ch) => ch !== event.channel);
+						}
 					}
 				case "videoRing":
 					//special param for starting vc, display ring/video ui
@@ -676,13 +684,31 @@ class rtcInterface {
 			this.localAudioStream = await navigator.mediaDevices.getUserMedia(
 				constraints
 			);
+
+			// Add input gain control
+			if (!this._audioContext) {
+				this._audioContext = new (window.AudioContext ||
+					window.webkitAudioContext)();
+			}
+			const source = this._audioContext.createMediaStreamSource(
+				this.localAudioStream
+			);
+
+			this._inputGainNode = this._audioContext.createGain();
+			this._inputGainNode.gain.value = this.inputGainValue;
+			source.connect(this._inputGainNode);
+
+			// Create a destination node and connect gain node to it
+			this._inputDestination =
+				this._audioContext.createMediaStreamDestination();
+			this._inputGainNode.connect(this._inputDestination);
+
+			// Replace localAudioStream with the processed stream
+			this.localAudioStream = this._inputDestination.stream;
 		} catch (err) {
 			console.error("Could not get local audio:", err);
 		}
 	}
-
-
-
 }
 
 function setChannelType(channel, type) {

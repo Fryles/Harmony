@@ -1,8 +1,8 @@
 {
   "user": {
-    "username": "Lumpy Bunny",
-    "userId": "74031170-9d7a-4a11-ac03-15ef4790f7dc",
-    "password": "pleasechangethis"
+    "username": "Tiny Dog",
+    "userId": "83535f11-4ad7-46e8-bdfc-a6d11e7b6344",
+    "password": "fuckyou?"
   },
   "servers": [
     {
@@ -21,10 +21,10 @@
   },
   "friends": [
     {
-      "name": "fran",
-      "nick": "frien",
+      "name": "buh",
+      "nick": "",
       "id": "whatmybabysaid",
-      "chatId": "special"
+      "chatId": "BUHCHAT"
     }
   ],
   "devices": {
@@ -77,11 +77,14 @@
       "deviceId": "default",
       "kind": "audiooutput",
       "label": "Default - Myle pods (Bluetooth)"
-    }
+    },
+    "videoInputDevice": null
   },
   "audio": {
     "inputGain": 1,
     "outputVolume": 0.8,
-    "enableNoiseSuppression": true
+    "hotMicThresh": 0.07,
+    "enableNoiseSuppression": true,
+    "ringVolume": 0.4
   }
 }

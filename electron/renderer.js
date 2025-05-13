@@ -284,6 +284,13 @@ function userLookup(userId) {
 	return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 }
 
+async function settingsInit() {
+	if (!rtc.localAudioStream) {
+		await rtc._initLocalAudio();
+	}
+	colorSliderWithAudio(rtc.localAudioStream, "hotMicThresh");
+}
+
 async function storePrefs() {
 	//get prefs from HTML, then store, and load them to our ui
 
@@ -332,6 +339,12 @@ async function storePrefs() {
 	);
 	localPrefs.audio.outputVolume = parseFloat(
 		document.getElementById("outputVolume").value
+	);
+	localPrefs.audio.hotMicThresh = parseFloat(
+		document.getElementById("hotMicThresh").value
+	);
+	localPrefs.audio.ringVolume = parseFloat(
+		document.getElementById("ringVolume").value
 	);
 	localPrefs.audio.enableNoiseSuppression = document.getElementById(
 		"enableNoiseSuppression"

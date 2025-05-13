@@ -25,7 +25,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 		console.log("Updating prefs with : ", prefs);
 		ipcRenderer.send("update-prefs", prefs);
 		loadPrefs(prefs);
-		promptDevices();
+		openSettings();
 	} else {
 		//we already have prefs, attempt to update w/ connected devices
 
@@ -64,7 +64,7 @@ function loadServers(prefs) {
 	document.getElementById("server-list").innerHTML += el;
 }
 
-function promptDevices() {
+function openSettings() {
 	//open settings modal, make sure document is loaded
 	openModal("settings-modal");
 }
@@ -104,17 +104,16 @@ function defaultPrefs() {
 			theme: "dark",
 			accentColor: "#856bf9",
 			language: "en-US",
-			ringVolume: 0.5,
 			notifications: true,
 			checkUpdate: true,
 			maxMsgHistory: 50,
 		},
 		friends: [
 			{
-				name: "fran",
-				nick: "frien",
+				name: "buh",
+				nick: "",
 				id: "whatmybabysaid",
-				chatId: "special",
+				chatId: "BUHCHAT",
 			},
 		],
 		devices: {
@@ -128,7 +127,9 @@ function defaultPrefs() {
 		audio: {
 			inputGain: 1.0,
 			outputVolume: 0.8,
+			hotMicThresh: 0.3,
 			enableNoiseSuppression: true,
+			ringVolume: 0.5,
 		},
 	};
 	return prefs;
@@ -156,6 +157,7 @@ function loadSettings(prefs) {
 	// Username
 	document.getElementById("username").value = prefs.user.username;
 	document.getElementById("userid").value = prefs.user.userId;
+	document.getElementById("password").value = prefs.user.password;
 
 	// Devices - populate dropdowns
 	populateDeviceDropdown(
@@ -176,7 +178,9 @@ function loadSettings(prefs) {
 
 	// Audio
 	document.getElementById("inputGain").value = prefs.audio.inputGain;
+	document.getElementById("hotMicThresh").value = prefs.audio.hotMicThresh;
 	document.getElementById("outputVolume").value = prefs.audio.outputVolume;
+	document.getElementById("ringVolume").value = prefs.audio.ringVolume;
 	document.getElementById("enableNoiseSuppression").checked =
 		prefs.audio.enableNoiseSuppression;
 

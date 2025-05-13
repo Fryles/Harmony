@@ -160,10 +160,10 @@ html {
 	color: var(--bulma-success) !important;
 }
 
-#voice-call.ringing:hover {
-	color: var(--bulma-danger) !important;
+#voice-call.danger:hover {
+	color: var(--bulma-danger-light) !important;
 }
-#voice-call.ringing.pickup:hover {
+#voice-call.pickup:hover {
 	color: var(--bulma-success-light) !important;
 }
 
@@ -221,7 +221,7 @@ html {
 }
 
 .slider {
-	width: 40%;
+	width: 80%;
 	accent-color: var(--bulma-primary);
 }
 
@@ -255,4 +255,32 @@ html {
 	box-shadow: 0 0px 5px 3px rgba(0, 0, 0, 0.2);
 	color: #fff;
 	font-weight: bold;
+}
+
+#hotMicThresh {
+	-webkit-appearance: none;
+	appearance: none;
+	background: transparent;
+	width: 80%;
+}
+#hotMicThresh::-webkit-slider-runnable-track {
+	background-color: #add8e6;
+	border-radius: 0.5rem;
+	height: 1.75rem;
+}
+
+/* slider thumb */
+#hotMicThresh::-webkit-slider-thumb {
+	-webkit-appearance: none; /* Override default look */
+	appearance: none;
+	cursor: pointer;
+	margin-top: -0.125rem; /* Centers thumb on the track */
+	background-color: var(--bulma-primary);
+	border-radius: 0.5rem;
+	height: 2rem;
+	width: 0.5rem;
+}
+
+#hotMicThresh:focus::-webkit-slider-thumb {
+	background-color: var(--bulma-primary-light);
 }
