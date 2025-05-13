@@ -12,6 +12,7 @@ main();
 async function main() {
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
+	selectedFriend = localPrefs.friends[0];
 	selfId = crypto.randomUUID(); //localPrefs.user.userId
 	// Hash userId with password to create a secret
 	userSecret = await hashbrown(`${selfId}:${localPrefs.user.password}`);

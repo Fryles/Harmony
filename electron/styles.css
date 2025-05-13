@@ -235,6 +235,7 @@ html {
 	transition: all 0.3s ease;
 	width: calc-size(auto, size);
 	z-index: 1;
+	min-width: 270px;
 }
 
 .friend-item {
@@ -264,7 +265,6 @@ html {
 	width: 80%;
 }
 #hotMicThresh::-webkit-slider-runnable-track {
-	background-color: #add8e6;
 	border-radius: 0.5rem;
 	height: 1.75rem;
 }
@@ -279,6 +279,7 @@ html {
 	border-radius: 0.5rem;
 	height: 2rem;
 	width: 0.5rem;
+	border: solid 1px var(--bulma-primary-light);
 }
 
 #hotMicThresh:focus::-webkit-slider-thumb {

@@ -153,6 +153,8 @@ class rtcInterface {
 		let e = document.getElementById("voice-mute").querySelector("i");
 		e.classList.toggle("fa-microphone");
 		e.classList.toggle("fa-microphone-slash");
+		e.classList.toggle("has-text-primary");
+		e.classList.toggle("has-text-danger");
 		if (this.localAudioStream) {
 			this.localAudioStream.getAudioTracks().forEach((track) => {
 				track.enabled = !e.classList.contains("fa-microphone-slash");
@@ -187,6 +189,7 @@ class rtcInterface {
 			this.ring = null;
 		}
 		removeVoiceUser(selfId);
+		document.getElementById("voice-mute").classList.add("is-hidden");
 		document.getElementById("voice-call").classList.remove("pickup");
 		document.getElementById("voice-call").classList.remove("danger");
 		document.getElementById("voice-call").classList.add("has-text-primary");
@@ -217,6 +220,7 @@ class rtcInterface {
 		if (toRemove) {
 			removeVoiceUser(toRemove);
 		}
+		document.getElementById("voice-mute").classList.add("is-hidden");
 		document.getElementById("voice-call").classList.remove("pickup");
 		document.getElementById("voice-list").classList.remove("ringing");
 		document.getElementById("voice-call").classList.remove("ringing");
@@ -231,6 +235,7 @@ class rtcInterface {
 			this.voiceRingEnd();
 		}
 		//change color of call button and stop anims
+		document.getElementById("voice-mute").classList.remove("is-hidden");
 		document.getElementById("voice-list").classList.remove("ringing");
 		document.getElementById("voice-call").classList.remove("ringing");
 		document.getElementById("voice-call").classList.remove("pickup");
@@ -290,6 +295,7 @@ class rtcInterface {
 			: 0.7;
 		this.ring.audio.play();
 		//add ourselves to the ui and play anims
+		document.getElementById("voice-mute").classList.remove("is-hidden");
 		document.getElementById("voice-call").classList.remove("pickup");
 		document.getElementById("voice-list").classList.add("ringing");
 		document.getElementById("voice-call").classList.add("ringing");
