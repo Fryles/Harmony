@@ -161,7 +161,7 @@ function colorSliderWithAudio(
 		styleTag.id = `hotMicSlider-style-${sliderId}`;
 		document.head.appendChild(styleTag);
 	}
-
+	//i hardcoded the icon whoops
 	function update() {
 		const amp = getAmplitude(); // 0..1
 		const percent = Math.min(amp * 100, 100);
@@ -172,6 +172,13 @@ function colorSliderWithAudio(
 			percent + 1
 		}%);
 			}
+		#hotMicThreshIcon{
+		${
+			amp > localPrefs.audio.hotMicThresh
+				? "color: var(--bulma-success) !important"
+				: ""
+		}
+		}
 		`;
 		requestAnimationFrame(update);
 	}

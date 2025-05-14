@@ -12,7 +12,7 @@ async function main() {
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
 	selectedFriend = localPrefs.friends[0];
-	selfId = crypto.randomUUID(); //localPrefs.user.userId
+	selfId = dev ? crypto.randomUUID() : localPrefs.user.userId;
 
 	if (localPrefs.user.password) {
 		let s = await hashbrown(`${selfId}:${localPrefs.user.password}`);
@@ -65,14 +65,22 @@ async function main() {
 }
 
 function webSocketInit(secret) {
+	//get session
+	const session = localStorage.getItem("rtcSession");
+	const auth = {
+		userId: selfId,
+		userName: localPrefs.user.name,
+		secret: secret,
+		session: session,
+	};
 	//init websocket
 	if (dev) {
 		window.socket = io("ws://localhost:3000", {
-			auth: { userId: selfId, userName: localPrefs.user.name, secret: secret },
+			auth: auth,
 		});
 	} else {
 		window.socket = io("https://harmony-server.glitch.me/", {
-			auth: { userId: selfId, userName: localPrefs.user.name, secret: secret },
+			auth: auth,
 		});
 	}
 	this.socket.emit("ready");
@@ -81,12 +89,14 @@ function webSocketInit(secret) {
 function sendFriendReq(userId) {}
 
 function sendChat(content) {
-	content = DOMPurify.sanitize(content);
+	const sanitizedContent = DOMPurify.sanitize(
+		content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, "")
+	);
 	//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM CURRENTCHAT
 	const msg = {
 		timestamp: Date.now(),
 		user: selfId,
-		content: content,
+		content: sanitizedContent,
 		channel: currentChat,
 	};
 	updateChat(msg);
@@ -130,7 +140,10 @@ function updateChat(msg) {
 		console.log("bad msg");
 		return;
 	}
-	const sanitizedContent = DOMPurify.sanitize(msg.content);
+	// Remove all id attributes and sanitize from msg.content
+	const sanitizedContent = DOMPurify.sanitize(
+		msg.content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, "")
+	);
 	let el = document.createElement("p");
 	let un = document.createElement("span");
 	un.className = "tag";
@@ -147,6 +160,9 @@ function updateChat(msg) {
 	el.appendChild(un);
 	el.innerHTML += "<br>" + sanitizedContent;
 	document.getElementById("chat-messages").appendChild(el);
+	// Auto-scroll to bottom
+	const chatMessages = document.getElementById("chat-messages");
+	chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function storeChat(msg, chatId) {
@@ -180,12 +196,7 @@ function storeChat(msg, chatId) {
 	);
 
 	//constrain to less than localprefs maxMsgHistory
-	if (
-		localPrefs &&
-		localPrefs.settings &&
-		typeof localPrefs.settings.maxMsgHistory === "number" &&
-		messages.length > localPrefs.settings.maxMsgHistory
-	) {
+	if (localPrefs && messages.length > localPrefs.settings.maxMsgHistory) {
 		messages = messages.slice(-localPrefs.settings.maxMsgHistory);
 	}
 

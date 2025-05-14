@@ -55,7 +55,7 @@ class rtcInterface {
 
 		this.socket.on("peerJoin", (data) => {
 			const newPeer = data.from;
-			console.log("New peer joined: ", newPeer);
+			console.log(`${newPeer} joined channel ${data.channel}`);
 			//add channel to peer
 			const pc = this.peerConnections[newPeer];
 			if (pc) {
@@ -70,6 +70,21 @@ class rtcInterface {
 				if (this.ring) {
 					//joining during ring... stop ring
 					this.voiceRingEnd();
+				}
+				// Add local audio tracks to the existing connection (if not already present)
+				if (this.localAudioStream) {
+					const senders = pc.getSenders();
+					this.localAudioStream.getTracks().forEach((track) => {
+						const alreadyAdded = senders.some(
+							(sender) => sender.track && sender.track.id === track.id
+						);
+						if (!alreadyAdded) {
+							pc.addTrack(track, this.localAudioStream);
+							console.log("Added local track to peer connection");
+						}
+					});
+				} else {
+					console.warn("No local audio when peer joined our vc");
 				}
 				addVoiceUser(newPeer);
 			}
@@ -97,11 +112,31 @@ class rtcInterface {
 
 			const [type] = data.channel ? data.channel.split(":") : [null];
 			if (type === "voice") {
+				// Remove local audio tracks from the peer connection when leaving voice
+				const pc = this.peerConnections[data.from];
+				if (pc && this.localAudioStream) {
+					const localTrackIds = this.localAudioStream
+						.getTracks()
+						.map((t) => t.id);
+					pc.getSenders().forEach((sender) => {
+						if (sender.track && localTrackIds.includes(sender.track.id)) {
+							pc.removeTrack(sender);
+						}
+					});
+				}
 				removeVoiceUser(data.from);
 			}
 		});
 
 		this.socket.on("message", (data) => {
+			if (data.session) {
+				//we got a session! lets store it!
+				try {
+					localStorage.setItem("rtcSession", data.session);
+				} catch (e) {
+					console.error("Failed to store session in localStorage:", e);
+				}
+			}
 			if (!data.msg || !data.from) return;
 			const peerId = data.from;
 			switch (data.msg.type) {
@@ -155,10 +190,12 @@ class rtcInterface {
 		e.classList.toggle("fa-microphone-slash");
 		e.classList.toggle("has-text-primary");
 		e.classList.toggle("has-text-danger");
-		if (this.localAudioStream) {
-			this.localAudioStream.getAudioTracks().forEach((track) => {
-				track.enabled = !e.classList.contains("fa-microphone-slash");
-			});
+		if (window.rtc.localAudioStream) {
+			window.rtc._inputGainNode.gain.value = e.classList.contains(
+				"fa-microphone-slash"
+			)
+				? 0
+				: window.rtc.inputGainValue;
 		}
 	}
 
@@ -220,7 +257,6 @@ class rtcInterface {
 		if (toRemove) {
 			removeVoiceUser(toRemove);
 		}
-		document.getElementById("voice-mute").classList.add("is-hidden");
 		document.getElementById("voice-call").classList.remove("pickup");
 		document.getElementById("voice-list").classList.remove("ringing");
 		document.getElementById("voice-call").classList.remove("ringing");

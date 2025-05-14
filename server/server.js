@@ -41,15 +41,24 @@ const db = await JSONFilePreset("db.json", {
 // AUTHENTICATION MIDDLEWARE
 io.use(async (socket, next) => {
 	const userId = socket.handshake.auth.userId;
-	const userName = socket.handshake.auth.userName;
-	const secret = socket.handshake.auth.secret;
-
 	// Validate userId is a valid UUID (v4)
 	const uuidV4Regex =
 		/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 	if (!uuidV4Regex.test(userId)) {
 		return next(new Error("Invalid userId: must be a valid UUID v4"));
 	}
+	//try session first
+	if (
+		db.data.users[userId] &&
+		socket.handshake.auth.session &&
+		db.data.users[userId].session === socket.handshake.auth.session
+	) {
+		//good session auth
+		//TODO: Check session timestamp to see if session expired
+		next();
+	}
+
+	const secret = socket.handshake.auth.secret;
 
 	const sessionToken = crypto.randomBytes(16).toString("hex");
 	const sessionTimestamp = Date.now();
@@ -61,6 +70,8 @@ io.use(async (socket, next) => {
 		});
 		next();
 	} else if (!db.data.users[userId]) {
+		//TODO add username validation
+		const userName = socket.handshake.auth.userName;
 		//no user for this id, registering and giving token
 		await db.update(
 			({ users }) =>
@@ -98,11 +109,11 @@ io.on("connection", (socket) => {
 				delete connections[peerId];
 			}
 			console.log(`Added ${peerId} to connections`);
-			// Let new peer know about all exisiting peers
 
 			socket.send({
-				from: "all",
+				from: "server",
 				target: peerId,
+				session: db.data.users[peerId].session,
 				payload: {
 					action: "open",
 					connections: Object.values(connections),
