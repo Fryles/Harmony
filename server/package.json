@@ -3,6 +3,7 @@
 	"version": "1.0",
 	"description": "Socket.io signaling, with rooms.",
 	"main": "server.js",
+	"type": "module",
 	"repository": "",
 	"author": "fryles",
 	"license": "give me 10%",
@@ -12,6 +13,7 @@
 	"dependencies": {
 		"cors": "^2.8.5",
 		"express": "^4.17.1",
+		"lowdb": "^7.0.1",
 		"semver": "^7.7.1",
 		"sirv": "^1.0.5",
 		"socket.io": "^4.0.1",
@@ -21,6 +23,6 @@
 		"nodemon": "^3.1.10"
 	},
 	"engines": {
-		"node": ">=16.x"
+		"node": ">=16.x <18.x"
 	}
 }

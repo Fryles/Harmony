@@ -1,9 +1,11 @@
 // IMPORTS
-const http = require("http");
-const express = require("express");
-const socketio = require("socket.io");
-const cors = require("cors");
-const sirv = require("sirv");
+import http from "http";
+import express from "express";
+import { Server as socketio } from "socket.io";
+import cors from "cors";
+import sirv from "sirv";
+import { JSONFilePreset } from "lowdb/node";
+import crypto from "crypto";
 
 // ENVIRONMENT VARIABLES
 const PORT = process.env.PORT || 3000;
@@ -13,17 +15,66 @@ const TOKEN = process.env.TOKEN || "SIGNALING123";
 const app = express();
 app.use(express.json(), cors());
 const server = http.createServer(app);
-const io = socketio(server, { cors: {} });
+const io = new socketio(server, { cors: {} });
+
+// DB
+const db = await JSONFilePreset("db.json", {
+	requests: {},
+	users: {},
+	ips: {},
+	servers: {},
+});
+
+//friend requests used to store pending requests that have not been accepted/denied
+//friend requests, {id: [{from,fromName,secret,timestamp}...]}
+//await db.update(({ requests }) => (requests[id].push({from,fromName,secret,timestamp})));
+
+//users holds auth/reg data for our... users
+//users, {id: { name, secret, session, sessionTimestamp }}
+
+//ips keeps fraud account registering in check. only 420 accountRegisters per IP
+//ips, ip: numRegs
+
+//servers tracks server message history (if enabled on creation)
+//servers, {key:[{msgObj}...]}
 
 // AUTHENTICATION MIDDLEWARE
-io.use((socket, next) => {
-	const token = socket.handshake.auth.token;
-	//TODO add lookups here to match userId and secret in DB
-	if (token === TOKEN) {
+io.use(async (socket, next) => {
+	const userId = socket.handshake.auth.userId;
+	const userName = socket.handshake.auth.userName;
+	const secret = socket.handshake.auth.secret;
+
+	// Validate userId is a valid UUID (v4)
+	const uuidV4Regex =
+		/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+	if (!uuidV4Regex.test(userId)) {
+		return next(new Error("Invalid userId: must be a valid UUID v4"));
+	}
+
+	const sessionToken = crypto.randomBytes(16).toString("hex");
+	const sessionTimestamp = Date.now();
+	if (db.data.users[userId] && db.data.users[userId].secret === secret) {
+		//this userID exists and has correct secret, give session token
+		await db.update(({ users }) => {
+			users[userId].session = sessionToken;
+			users[userId].sessionTimestamp = sessionTimestamp;
+		});
+		next();
+	} else if (!db.data.users[userId]) {
+		//no user for this id, registering and giving token
+		await db.update(
+			({ users }) =>
+				(users[userId] = {
+					name: userName,
+					secret: secret,
+					session: sessionToken,
+					sessionTimestamp: sessionTimestamp,
+				})
+		);
 		next();
 	} else {
-		console.log("bad auth");
-		next(new Error("Authentication error"));
+		//failed auth for existing user...
+		return next(new Error("Authentication failed: invalid secret for userId"));
 	}
 });
 
@@ -37,14 +88,15 @@ app.get("/connections", (req, res) => {
 io.on("connection", (socket) => {
 	console.log("User connected with id", socket.id);
 
-	socket.on("ready", (peerId) => {
-		// Make sure that the hostname is unique, if the hostname is already in connections, send an error and disconnect
-		if (peerId in connections || peerId === null) {
-			socket.emit("uniquenessError", {
-				message: `${peerId} is already connected to the signalling server. Please change your peer ID and try again.`,
-			});
+	socket.on("ready", () => {
+		const peerId = socket.handshake.auth.userId;
+
+		if (!peerId) {
 			socket.disconnect(true);
 		} else {
+			if (peerId && peerId in connections) {
+				delete connections[peerId];
+			}
 			console.log(`Added ${peerId} to connections`);
 			// Let new peer know about all exisiting peers
 

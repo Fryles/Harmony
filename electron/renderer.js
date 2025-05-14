@@ -4,9 +4,8 @@ var selectedFriend;
 var currentChat;
 var localPrefs;
 var selfId;
-var userSecret;
+const dev = true;
 
-//TODO move secret out of frontend probably
 main();
 
 async function main() {
@@ -14,15 +13,14 @@ async function main() {
 	localPrefs = await window.electronAPI.getPrefs();
 	selectedFriend = localPrefs.friends[0];
 	selfId = crypto.randomUUID(); //localPrefs.user.userId
-	// Hash userId with password to create a secret
-	userSecret = await hashbrown(`${selfId}:${localPrefs.user.password}`);
-	console.log("Secret: ", userSecret);
 
-	//init websocket
-	window.socket = io("ws://localhost:3030", {
-		auth: { token: "SIGNALING123", userId: selfId, secret: userSecret },
-	});
-	this.socket.emit("ready", selfId);
+	if (localPrefs.user.password) {
+		let s = await hashbrown(`${selfId}:${localPrefs.user.password}`);
+		webSocketInit(s);
+	} else {
+		//no password set yet, hold off on auth with ws
+	}
+
 	//init chat and voice interfaces
 	rtc = new rtcInterface();
 	// VoiceInterface = new rtcVoice();
@@ -64,6 +62,20 @@ async function main() {
 	document
 		.getElementById("voice-call")
 		.addEventListener("click", () => rtc.callVoice(currentChat));
+}
+
+function webSocketInit(secret) {
+	//init websocket
+	if (dev) {
+		window.socket = io("ws://localhost:3000", {
+			auth: { userId: selfId, userName: localPrefs.user.name, secret: secret },
+		});
+	} else {
+		window.socket = io("https://harmony-server.glitch.me/", {
+			auth: { userId: selfId, userName: localPrefs.user.name, secret: secret },
+		});
+	}
+	this.socket.emit("ready");
 }
 
 function sendFriendReq(userId) {}
@@ -276,7 +288,7 @@ function userLookup(userId) {
 	if (!localPrefs || !localPrefs.friends)
 		return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 	if (userId === localPrefs.user.userId) {
-		return { name: localPrefs.user.username, nick: "" };
+		return { name: localPrefs.user.name, nick: "" };
 	}
 	const friend = localPrefs.friends.find((f) => f.id === userId);
 	if (friend) {
@@ -304,8 +316,8 @@ async function storePrefs() {
 		document.getElementById("notifications").checked;
 
 	// Username
-	localPrefs.user.username = document.getElementById("username").value;
-	if (!localPrefs.user.username) {
+	localPrefs.user.name = document.getElementById("username").value;
+	if (!localPrefs.user.name) {
 		alert("Username cannot be empty retard.");
 		return;
 	}

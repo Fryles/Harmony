@@ -91,7 +91,7 @@ function defaultPrefs() {
 		user: {
 			username: psuedoUser(uid),
 			userId: uid,
-			password: "pleasechangethis",
+			password: "",
 		},
 		servers: [
 			{
