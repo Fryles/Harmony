@@ -190,7 +190,7 @@ io.on("connection", (socket) => {
 });
 
 // SERVE STATIC FILES
-app.use(sirv("public", { DEV }));
+app.use(sirv("public"));
 
 // RUN APP
 server.listen(PORT, console.log(`Listening on PORT ${PORT}`));
