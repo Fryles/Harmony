@@ -206,8 +206,6 @@ class rtcInterface {
 	}
 
 	stopLocalVoice() {
-		console.log("ASd");
-
 		if (this.localAudioStream) {
 			this.localAudioStream.getTracks().forEach((track) => {
 				track.stop();
@@ -223,7 +221,7 @@ class rtcInterface {
 	}
 
 	VoiceHangup() {
-		stopLocalVoice();
+		this.stopLocalVoice();
 		if (this.mediaChannel) {
 			this.leaveChannel(this.mediaChannel);
 		} else {
@@ -727,15 +725,16 @@ class rtcInterface {
 		try {
 			// Try to get the preferred audio input device from prefs.json (if available)
 			let deviceId = null;
-			if (localPrefs && localPrefs.devices.audioInputDevice) {
-				const audioInputDevices = localPrefs.devices.audioInputDevices;
-				const preferredDevice = localPrefs.devices.audioInputDevice
-					? localPrefs.devices.audioInputDevice.deviceId
-					: audioInputDevices[0].deviceId; // Use the first device as preferred
-				deviceId = preferredDevice;
-			} else {
+
+			const audioInputDevices = localPrefs.devices.audioInputDevices;
+			const preferredDevice = localPrefs.devices.audioInputDevice
+				? localPrefs.devices.audioInputDevice.deviceId
+				: audioInputDevices[0].deviceId; // Use the first device as preferred
+			deviceId = preferredDevice;
+			if (!preferredDevice) {
 				//no device in prefs, alert user
 				alert("Could not get audio input, please double check your settings.");
+				return;
 			}
 			const constraints = {
 				audio: deviceId ? { deviceId: { exact: deviceId } } : true,

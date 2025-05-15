@@ -14,7 +14,7 @@
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#856bf9",
+    "accentColor": "#ff77bb",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true,
@@ -84,7 +84,7 @@
   "audio": {
     "inputGain": 1,
     "outputVolume": 0.8,
-    "hotMicThresh": 0.3,
+    "hotMicThresh": 0.08,
     "enableNoiseSuppression": true,
     "ringVolume": 0.5
   }

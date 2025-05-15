@@ -257,6 +257,72 @@ io.on("connection", (socket) => {
 		}
 	});
 
+	//friend requests are tracked with 4 statuses:
+	//awaiting - first pushed to server
+	//accepted - the reciever has accepted the request
+	//rejected - the reciever has denied the request
+	//recieved - the sender has acked the response - req can be deleted
+	socket.on("friendRequest", async (friend, callback) => {
+		//validate friend is not imaginary
+		const uuidV4Regex =
+			/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+		if (!uuidV4Regex.test(friend)) {
+			if (callback) callback({ success: false, error: "Invalid userId" });
+			return;
+		}
+		if (!db.data.users[friend]) {
+			if (callback)
+				callback({ success: false, error: "UserId does not exist" });
+			return;
+		}
+
+		const userId = socket.handshake.auth.userId;
+		const requests = db.data.requests;
+
+		// Check for existing outgoing request
+		const outgoing = requests.find((r) => r.to === friend && r.from === userId);
+		if (outgoing) {
+			if (callback) callback({ success: false, error: "Request already sent" });
+			return;
+		}
+
+		// Check for incoming request (reverse)
+		const incomingIdx = requests.findIndex(
+			(r) => r.to === userId && r.from === friend
+		);
+		if (requests[incomingIdx]) {
+			// we already have a request for us :D
+			db.data.requests[incomingIdx].status = "accepted";
+
+			// Emit friendRequestResponse to both peers if possible
+			const toPeer = connections[friend];
+			if (toPeer) {
+				io.to(toPeer.socketId).emit(
+					"friendRequestResponse",
+					db.data.requests[incomingIdx]
+				);
+				db.data.requests[incomingIdx].status = "recieved";
+			}
+			//respond with accepted req
+			socket.emit("friendRequestResponse", db.data.requests[incomingIdx]);
+			await db.write();
+			return;
+		}
+
+		// No outgoing or incoming, create new request
+		const fr = {
+			from: userId,
+			to: friend,
+			chat: crypto.randomBytes(24).toString("hex"),
+			time: Date.now(),
+			status: "awaiting",
+		};
+
+		db.data.requests.push(fr);
+		await db.data.requests.write();
+		if (callback) callback(fr);
+	});
+
 	socket.on("changePass", async (newSecret, callback) => {
 		const userId = socket.handshake.auth.userId;
 		const oldSecret = socket.handshake.auth.secret;

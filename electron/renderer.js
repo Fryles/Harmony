@@ -4,7 +4,7 @@ var selectedFriend;
 var currentChat;
 var localPrefs;
 var selfId;
-const dev = false;
+const dev = 1;
 
 main();
 
@@ -19,6 +19,7 @@ async function main() {
 
 	await webSocketInit();
 	rtc = new rtcInterface();
+	checkFriendReqs();
 	if (!localPrefs.user.password) {
 		//get user to set password
 	}
@@ -29,7 +30,13 @@ async function main() {
 	//TODO start rtc chat with all possible peers
 
 	// attach listeners
-	document.getElementById("settings-save").onclick = storePrefs;
+	document
+		.getElementById("settings-save")
+		.addEventListener("click", storePrefs);
+	document.getElementById("add-friend").addEventListener("click", () => {
+		sendFriendReq(document.getElementById("friendIdInput").value);
+	});
+
 	document.getElementById("hotMicThresh").onchange = () => {
 		rtc.hotMicThresh = parseFloat(
 			document.getElementById("hotMicThresh").value
@@ -100,7 +107,7 @@ async function webSocketInit() {
 		session: session,
 	};
 	//init websocket
-	if (1) {
+	if (dev) {
 		window.socket = io("ws://localhost:3000", {
 			auth: auth,
 		});
@@ -112,7 +119,23 @@ async function webSocketInit() {
 	this.socket.emit("ready");
 }
 
-function sendFriendReq(userId) {}
+function sendFriendReq(userId) {
+	console.log("sending fr for ", userId);
+	socket.emit("friendRequest", userId);
+}
+
+function checkFriendReqs() {
+	//should be run on init only
+	socket.on("friendRequestResponse", (request) => {
+		//add friend
+		localPrefs.friends.push({
+			name: request.to == selfId ? request.from : request.to,
+			id: request.to == selfId ? request.from : request.to,
+			chat: request.chat,
+		});
+		updatePrefs();
+	});
+}
 
 function sendChat(content) {
 	const sanitizedContent = DOMPurify.sanitize(
@@ -376,7 +399,9 @@ async function storePrefs() {
 		validateField(passwordEl);
 		return;
 	}
-	changePass(passwordEl.value);
+	if (passwordEl.value !== localPrefs.user.password) {
+		changePass(passwordEl.value);
+	}
 
 	// Devices
 	const getSelectedDevice = (selectId, devices) => {
@@ -418,15 +443,10 @@ async function storePrefs() {
 	window.electronAPI.updatePrefs(localPrefs);
 }
 
-// Add this function for validation
 function validateField(element) {
-	// Example: highlight the field and show a message
-
 	element.classList.add("is-danger");
 	element.focus();
 	setTimeout(element.classList.remove("is-danger"), 6000);
-	// Optionally, show a tooltip or error message
-	// You can customize this function as needed
 }
 
 //hash password to hex str
