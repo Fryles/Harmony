@@ -89,6 +89,8 @@ io.use(async (socket, next) => {
 		return next();
 	} else {
 		//failed auth for existing user...
+		console.log("client failed auth for existing user");
+
 		return next(new Error("Authentication failed: invalid secret for userId"));
 	}
 });
@@ -253,6 +255,24 @@ io.on("connection", (socket) => {
 		} else {
 			console.log(socket.id, "has disconnected");
 		}
+	});
+
+	socket.on("changePass", async (newSecret, callback) => {
+		const userId = socket.handshake.auth.userId;
+		const oldSecret = socket.handshake.auth.secret;
+		const user = db.data.users[userId];
+		if (!user) {
+			if (callback) callback({ success: false, error: "User not found" });
+			return;
+		}
+		if (user.secret !== oldSecret) {
+			if (callback) callback({ success: false, error: "Secret incorrect" });
+			return;
+		}
+		await db.update(({ users }) => {
+			users[userId].secret = newSecret;
+		});
+		if (callback) callback({ success: true });
 	});
 });
 

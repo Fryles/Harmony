@@ -85,17 +85,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	var rootEl = document.documentElement;
 	var $modals = getAll(".modal");
-	var $modalCloses = getAll(
-		".modal-background, .modal-close, .modal-card-head .delete, .modal-card-foot"
-	);
-
-	if ($modalCloses.length > 0) {
-		$modalCloses.forEach(function ($el) {
-			$el.addEventListener("click", function () {
-				closeModals();
-			});
-		});
-	}
 
 	function closeModals() {
 		rootEl.classList.remove("is-clipped");

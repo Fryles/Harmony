@@ -1,8 +1,9 @@
 {
   "user": {
-    "username": "Loopy Fox",
+    "username": "Swole Wolf",
     "userId": "810cb4b9-4278-4ecd-ada8-aaf6accedc8f",
-    "password": ""
+    "password": "test",
+    "name": "Loopy Fox"
   },
   "servers": [
     {
@@ -77,7 +78,8 @@
       "deviceId": "default",
       "kind": "audiooutput",
       "label": "Default - Myle pods (Bluetooth)"
-    }
+    },
+    "videoInputDevice": null
   },
   "audio": {
     "inputGain": 1,

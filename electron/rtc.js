@@ -138,7 +138,7 @@ class rtcInterface {
 				//we got a session! lets store it!
 				this.socket.auth.session = data.session;
 				try {
-					localStorage.setItem("rtcSession", data.session);
+					localStorage.setItem("session", data.session);
 				} catch (e) {
 					console.error("Failed to store session in localStorage:", e);
 				}
@@ -205,13 +205,25 @@ class rtcInterface {
 		}
 	}
 
-	VoiceHangup() {
+	stopLocalVoice() {
+		console.log("ASd");
+
 		if (this.localAudioStream) {
 			this.localAudioStream.getTracks().forEach((track) => {
 				track.stop();
 			});
 			this.localAudioStream = null;
 		}
+		if (this.unProcessedLocalAudio) {
+			this.unProcessedLocalAudio.getTracks().forEach((track) => {
+				track.stop();
+			});
+			this.unProcessedLocalAudio = null;
+		}
+	}
+
+	VoiceHangup() {
+		stopLocalVoice();
 		if (this.mediaChannel) {
 			this.leaveChannel(this.mediaChannel);
 		} else {
@@ -756,8 +768,10 @@ class rtcInterface {
 			this.localAudioStream = this._inputDestination.stream;
 
 			const getAmplitude = getAudioAmplitude(this.unProcessedLocalAudio);
-			attachAudioVisualizer(this.unProcessedLocalAudio, "unpcs");
-			attachAudioVisualizer(this.localAudioStream, "local");
+
+			//debug
+			// attachAudioVisualizer(this.unProcessedLocalAudio, "unpcs");
+			// attachAudioVisualizer(this.localAudioStream, "local");
 			// Add hot mic gating system
 			const updateGainBasedOnAmplitude = () => {
 				const amp = getAmplitude();

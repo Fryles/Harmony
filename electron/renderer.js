@@ -4,7 +4,7 @@ var selectedFriend;
 var currentChat;
 var localPrefs;
 var selfId;
-const dev = true;
+const dev = false;
 
 main();
 
@@ -13,15 +13,20 @@ async function main() {
 	localPrefs = await window.electronAPI.getPrefs();
 	selectedFriend = localPrefs.friends[0];
 	selfId = dev ? crypto.randomUUID() : localPrefs.user.userId;
-	let s = await hashbrown(`${selfId}:${localPrefs.user.password}`);
-	localStorage.setItem("secret", s);
-	webSocketInit(s);
+	localPrefs.user.username = dev
+		? window.electronAPI.getPsuedoUser(selfId)
+		: localPrefs.user.username;
+
+	await webSocketInit();
+	rtc = new rtcInterface();
 	if (!localPrefs.user.password) {
 		//get user to set password
 	}
 	//init chat and voice interfaces
-	rtc = new rtcInterface();
+
 	// VoiceInterface = new rtcVoice();
+
+	//TODO start rtc chat with all possible peers
 
 	// attach listeners
 	document.getElementById("settings-save").onclick = storePrefs;
@@ -83,17 +88,19 @@ async function main() {
 		.addEventListener("click", () => rtc.callVoice(currentChat));
 }
 
-function webSocketInit(secret) {
+async function webSocketInit() {
 	//get session
-	const session = localStorage.getItem("rtcSession");
+	const session = localStorage.getItem("session");
+	let s = await hashbrown(`${selfId}:${localPrefs.user.password}`);
+	// localStorage.setItem("secret", s);
 	const auth = {
 		userId: selfId,
-		userName: localPrefs.user.name,
-		secret: secret,
+		userName: localPrefs.user.username,
+		secret: s,
 		session: session,
 	};
 	//init websocket
-	if (dev) {
+	if (1) {
 		window.socket = io("ws://localhost:3000", {
 			auth: auth,
 		});
@@ -222,6 +229,18 @@ function storeChat(msg, chatId) {
 	localStorage.setItem(key, JSON.stringify(messages));
 }
 
+async function changePass(newPass) {
+	let newSecret = await hashbrown(`${selfId}:${newPass}`);
+	rtc.socket.emit("changePass", newSecret, (e) => {
+		if (e.success) {
+			localPrefs.user.password = newPass;
+			window.electronAPI.updatePrefs(localPrefs);
+		} else {
+			//notify failure
+		}
+	});
+}
+
 function selectFriend(e) {
 	if (e.target.id == "friends-header" || e.target.id == "addFriendBtn") {
 		return;
@@ -318,7 +337,7 @@ function userLookup(userId) {
 	if (!localPrefs || !localPrefs.friends)
 		return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 	if (userId === localPrefs.user.userId) {
-		return { name: localPrefs.user.name, nick: "" };
+		return { name: localPrefs.user.username, nick: "" };
 	}
 	const friend = localPrefs.friends.find((f) => f.id === userId);
 	if (friend) {
@@ -345,18 +364,19 @@ async function storePrefs() {
 
 	// Username
 	const usernameEl = document.getElementById("username");
-	localPrefs.user.name = usernameEl.value;
-	if (!localPrefs.user.name) {
+	if (!usernameEl.value) {
 		validateField(usernameEl);
 		return;
 	}
+	localPrefs.user.username = usernameEl.value;
+
 	// Password
 	const passwordEl = document.getElementById("password");
-	localPrefs.user.password = passwordEl.value;
-	if (!localPrefs.user.password) {
+	if (!passwordEl.value) {
 		validateField(passwordEl);
 		return;
 	}
+	changePass(passwordEl.value);
 
 	// Devices
 	const getSelectedDevice = (selectId, devices) => {
@@ -396,12 +416,12 @@ async function storePrefs() {
 
 	// Save and reload
 	window.electronAPI.updatePrefs(localPrefs);
-	closeModals();
 }
 
 // Add this function for validation
 function validateField(element) {
 	// Example: highlight the field and show a message
+
 	element.classList.add("is-danger");
 	element.focus();
 	setTimeout(element.classList.remove("is-danger"), 6000);
@@ -423,6 +443,18 @@ async function hashbrown(pwd) {
 //modal control
 var rootEl = document.documentElement;
 var $modals = getAll(".modal");
+var $modalCloses = getAll(
+	".modal-background, .modal-close, .modal-card-head .delete, .close"
+);
+
+if ($modalCloses.length > 0) {
+	$modalCloses.forEach(function ($el) {
+		$el.addEventListener("click", function () {
+			closeModals();
+		});
+	});
+}
+
 function getAll(selector) {
 	return Array.prototype.slice.call(document.querySelectorAll(selector), 0);
 }
@@ -431,9 +463,13 @@ function openModal(target) {
 	rootEl.classList.add("is-clipped");
 	$target.classList.add("is-active");
 }
+
 function closeModals() {
 	rootEl.classList.remove("is-clipped");
 	$modals.forEach(function ($el) {
 		$el.classList.remove("is-active");
 	});
+	if (!rtc.mediaChannel) {
+		rtc.stopLocalVoice();
+	}
 }
