@@ -13,27 +13,46 @@ async function main() {
 	localPrefs = await window.electronAPI.getPrefs();
 	selectedFriend = localPrefs.friends[0];
 	selfId = dev ? crypto.randomUUID() : localPrefs.user.userId;
-
-	if (localPrefs.user.password) {
-		let s = await hashbrown(`${selfId}:${localPrefs.user.password}`);
-		webSocketInit(s);
-	} else {
-		//no password set yet, hold off on auth with ws
+	let s = await hashbrown(`${selfId}:${localPrefs.user.password}`);
+	localStorage.setItem("secret", s);
+	webSocketInit(s);
+	if (!localPrefs.user.password) {
+		//get user to set password
 	}
-
 	//init chat and voice interfaces
 	rtc = new rtcInterface();
 	// VoiceInterface = new rtcVoice();
 
 	// attach listeners
-	document.getElementById("settings-save").onclick = () => storePrefs();
+	document.getElementById("settings-save").onclick = storePrefs;
+	document.getElementById("hotMicThresh").onchange = () => {
+		rtc.hotMicThresh = parseFloat(
+			document.getElementById("hotMicThresh").value
+		);
+	};
+	var $modalButtons = getAll(".modal-button");
+	if ($modalButtons.length > 0) {
+		$modalButtons.forEach(function ($el) {
+			$el.addEventListener("click", async function () {
+				var target = $el.dataset.target;
+				openModal(target);
+				if (target == "settings-modal") {
+					if (!rtc.localAudioStream) {
+						await rtc._initLocalAudio();
+						colorSliderWithAudio(rtc.unProcessedLocalAudio, "hotMicThresh");
+					} else {
+						colorSliderWithAudio(rtc.unProcessedLocalAudio, "hotMicThresh");
+					}
+				}
+			});
+		});
+	}
 
 	const serverListObserver = new MutationObserver(() => {
 		document.querySelectorAll(".server-item").forEach((div) => {
 			div.addEventListener("click", selectServerItem, true);
 		});
 	});
-
 	serverListObserver.observe(document.getElementById("server-list"), {
 		subtree: true,
 		childList: true,
@@ -308,33 +327,34 @@ function userLookup(userId) {
 	return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 }
 
-async function settingsInit() {
-	if (!rtc.localAudioStream) {
-		await rtc._initLocalAudio();
-	}
-	colorSliderWithAudio(rtc.localAudioStream, "hotMicThresh");
-}
-
 async function storePrefs() {
 	//get prefs from HTML, then store, and load them to our ui
-
 	localPrefs = await window.electronAPI.getPrefs();
 	// Settings
-	localPrefs.settings.accentColor =
-		document.getElementById("accentColor").value;
+	const accentColorEl = document.getElementById("accentColor");
+	const accentColorValue = accentColorEl.value;
+	if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(accentColorValue)) {
+		validateField(accentColorEl);
+		return;
+	}
+	localPrefs.settings.accentColor = accentColorValue;
+
 	localPrefs.settings.theme = document.getElementById("theme").value;
 	localPrefs.settings.notifications =
 		document.getElementById("notifications").checked;
 
 	// Username
-	localPrefs.user.name = document.getElementById("username").value;
+	const usernameEl = document.getElementById("username");
+	localPrefs.user.name = usernameEl.value;
 	if (!localPrefs.user.name) {
-		alert("Username cannot be empty retard.");
+		validateField(usernameEl);
 		return;
 	}
-	localPrefs.user.password = document.getElementById("password").value;
+	// Password
+	const passwordEl = document.getElementById("password");
+	localPrefs.user.password = passwordEl.value;
 	if (!localPrefs.user.password) {
-		alert("Password cannot be empty retard.");
+		validateField(passwordEl);
 		return;
 	}
 
@@ -376,6 +396,17 @@ async function storePrefs() {
 
 	// Save and reload
 	window.electronAPI.updatePrefs(localPrefs);
+	closeModals();
+}
+
+// Add this function for validation
+function validateField(element) {
+	// Example: highlight the field and show a message
+	element.classList.add("is-danger");
+	element.focus();
+	setTimeout(element.classList.remove("is-danger"), 6000);
+	// Optionally, show a tooltip or error message
+	// You can customize this function as needed
 }
 
 //hash password to hex str
@@ -387,4 +418,22 @@ async function hashbrown(pwd) {
 		.map((b) => b.toString(16).padStart(2, "0"))
 		.join(""); // convert bytes to hex string
 	return hashHex;
+}
+
+//modal control
+var rootEl = document.documentElement;
+var $modals = getAll(".modal");
+function getAll(selector) {
+	return Array.prototype.slice.call(document.querySelectorAll(selector), 0);
+}
+function openModal(target) {
+	var $target = document.getElementById(target);
+	rootEl.classList.add("is-clipped");
+	$target.classList.add("is-active");
+}
+function closeModals() {
+	rootEl.classList.remove("is-clipped");
+	$modals.forEach(function ($el) {
+		$el.classList.remove("is-active");
+	});
 }

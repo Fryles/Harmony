@@ -48,14 +48,16 @@ io.use(async (socket, next) => {
 		return next(new Error("Invalid userId: must be a valid UUID v4"));
 	}
 	//try session first
-	if (
-		db.data.users[userId] &&
-		socket.handshake.auth.session &&
-		db.data.users[userId].session === socket.handshake.auth.session
-	) {
-		//good session auth
-		//TODO: Check session timestamp to see if session expired
-		next();
+	if (db.data.users[userId] && socket.handshake.auth.session) {
+		if (db.data.users[userId].session === socket.handshake.auth.session) {
+			//good session auth
+			//TODO: Check session timestamp to see if session expired
+			console.log("client logged in with session token");
+			return next();
+		} else {
+			//sent bad session, continue with auth
+			console.log("client sent incorrect session");
+		}
 	}
 
 	const secret = socket.handshake.auth.secret;
@@ -68,7 +70,8 @@ io.use(async (socket, next) => {
 			users[userId].session = sessionToken;
 			users[userId].sessionTimestamp = sessionTimestamp;
 		});
-		next();
+		console.log("client logged in, sending session w/ ready");
+		return next();
 	} else if (!db.data.users[userId]) {
 		//TODO add username validation
 		const userName = socket.handshake.auth.userName;
@@ -82,7 +85,8 @@ io.use(async (socket, next) => {
 					sessionTimestamp: sessionTimestamp,
 				})
 		);
-		next();
+		console.log("client registered, sending session w/ ready");
+		return next();
 	} else {
 		//failed auth for existing user...
 		return next(new Error("Authentication failed: invalid secret for userId"));

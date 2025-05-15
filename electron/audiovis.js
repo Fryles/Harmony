@@ -173,11 +173,7 @@ function colorSliderWithAudio(
 		}%);
 			}
 		#hotMicThreshIcon{
-		${
-			amp > localPrefs.audio.hotMicThresh
-				? "color: var(--bulma-success) !important"
-				: ""
-		}
+		${amp > rtc.hotMicThresh ? "color: var(--bulma-success) !important" : ""}
 		}
 		`;
 		requestAnimationFrame(update);

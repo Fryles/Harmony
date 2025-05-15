@@ -25,7 +25,8 @@ window.addEventListener("DOMContentLoaded", async () => {
 		console.log("Updating prefs with : ", prefs);
 		ipcRenderer.send("update-prefs", prefs);
 		loadPrefs(prefs);
-		openSettings();
+		openModal("settings-modal");
+		settingsInit();
 	} else {
 		//we already have prefs, attempt to update w/ connected devices
 
@@ -64,25 +65,12 @@ function loadServers(prefs) {
 	document.getElementById("server-list").innerHTML += el;
 }
 
-function openSettings() {
-	//open settings modal, make sure document is loaded
-	openModal("settings-modal");
-}
-
 //bulma js
 function openModal(target) {
 	const rootEl = document.documentElement;
 	var $target = document.getElementById(target);
 	rootEl.classList.add("is-clipped");
 	$target.classList.add("is-active");
-}
-
-function closeModals() {
-	const rootEl = document.documentElement;
-	rootEl.classList.remove("is-clipped");
-	$modals.forEach(function ($el) {
-		$el.classList.remove("is-active");
-	});
 }
 
 function defaultPrefs() {

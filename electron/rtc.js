@@ -1,5 +1,3 @@
-// Simple WebRTC text messaging using DataChannels (multi-peer support)
-
 class rtcInterface {
 	constructor() {
 		this.signalingChannel = null; //channel we are currently signaling on
@@ -12,16 +10,23 @@ class rtcInterface {
 			iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 		};
 		this.localAudioStream = null;
+		this.unProcessedLocalAudio = null;
 		this.socket = window.socket;
 		this.ring = null;
 		this.ringTimeout = 10000;
 		this._lastCallVoice = 0;
 		this.inputGainValue = localPrefs.audio.inputGain;
+		this.hotMicThresh = localPrefs.audio.hotMicThresh;
 
 		this._registerSocketEvents();
 	}
 
 	_registerSocketEvents() {
+		if (!window.socket) {
+			setTimeout(this._registerSocketEvents, 5000);
+		} else if (!this.socket && window.socket) {
+			this.socket = window.socket;
+		}
 		this.socket.on("welcome", (data) => {
 			//ran after we join a new channel
 			console.log("Welcome: ", data);
@@ -131,6 +136,7 @@ class rtcInterface {
 		this.socket.on("message", (data) => {
 			if (data.session) {
 				//we got a session! lets store it!
+				this.socket.auth.session = data.session;
 				try {
 					localStorage.setItem("rtcSession", data.session);
 				} catch (e) {
@@ -726,6 +732,7 @@ class rtcInterface {
 			this.localAudioStream = await navigator.mediaDevices.getUserMedia(
 				constraints
 			);
+			this.unProcessedLocalAudio = this.localAudioStream;
 
 			// Add input gain control
 			if (!this._audioContext) {
@@ -747,8 +754,29 @@ class rtcInterface {
 
 			// Replace localAudioStream with the processed stream
 			this.localAudioStream = this._inputDestination.stream;
+
+			const getAmplitude = getAudioAmplitude(this.unProcessedLocalAudio);
+			attachAudioVisualizer(this.unProcessedLocalAudio, "unpcs");
+			attachAudioVisualizer(this.localAudioStream, "local");
+			// Add hot mic gating system
+			const updateGainBasedOnAmplitude = () => {
+				const amp = getAmplitude();
+				if (amp < this.hotMicThresh) {
+					this._inputGainNode.gain.value = 0;
+				} else if (
+					!document
+						.getElementById("voice-mute")
+						.querySelector("i")
+						.classList.contains("fa-microphone-slash")
+				) {
+					this._inputGainNode.gain.value = this.inputGainValue;
+				}
+				requestAnimationFrame(updateGainBasedOnAmplitude);
+			};
+			updateGainBasedOnAmplitude();
 		} catch (err) {
 			console.error("Could not get local audio:", err);
+			alert("could not find audio device specified in settings");
 		}
 	}
 }

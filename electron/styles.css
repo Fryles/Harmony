@@ -235,7 +235,7 @@ html {
 	transition: all 0.3s ease;
 	width: calc-size(auto, size);
 	z-index: 1;
-	min-width: 270px;
+	min-width: 250px;
 }
 
 .friend-item {
@@ -284,4 +284,8 @@ html {
 
 #hotMicThresh:focus::-webkit-slider-thumb {
 	background-color: var(--bulma-primary-light);
+}
+
+#hotMicThreshIcon {
+	transition: all 0.2s ease;
 }

@@ -1,8 +1,8 @@
 {
   "user": {
-    "name": "undefined",
-    "userId": "83535f11-4ad7-46e8-bdfc-a6d11e7b6344",
-    "password": "fuckyou?"
+    "username": "Loopy Fox",
+    "userId": "810cb4b9-4278-4ecd-ada8-aaf6accedc8f",
+    "password": ""
   },
   "servers": [
     {
@@ -77,14 +77,13 @@
       "deviceId": "default",
       "kind": "audiooutput",
       "label": "Default - Myle pods (Bluetooth)"
-    },
-    "videoInputDevice": null
+    }
   },
   "audio": {
-    "inputGain": 0.96,
+    "inputGain": 1,
     "outputVolume": 0.8,
-    "hotMicThresh": 0.2,
+    "hotMicThresh": 0.3,
     "enableNoiseSuppression": true,
-    "ringVolume": 0.4
+    "ringVolume": 0.5
   }
 }

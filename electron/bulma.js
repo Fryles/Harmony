@@ -85,19 +85,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	var rootEl = document.documentElement;
 	var $modals = getAll(".modal");
-	var $modalButtons = getAll(".modal-button");
 	var $modalCloses = getAll(
-		".modal-background, .modal-close, .modal-card-head .delete, .modal-card-foot .button"
+		".modal-background, .modal-close, .modal-card-head .delete, .modal-card-foot"
 	);
-
-	if ($modalButtons.length > 0) {
-		$modalButtons.forEach(function ($el) {
-			$el.addEventListener("click", function () {
-				var target = $el.dataset.target;
-				openModal(target);
-			});
-		});
-	}
 
 	if ($modalCloses.length > 0) {
 		$modalCloses.forEach(function ($el) {
@@ -105,12 +95,6 @@ document.addEventListener("DOMContentLoaded", function () {
 				closeModals();
 			});
 		});
-	}
-
-	function openModal(target) {
-		var $target = document.getElementById(target);
-		rootEl.classList.add("is-clipped");
-		$target.classList.add("is-active");
 	}
 
 	function closeModals() {
