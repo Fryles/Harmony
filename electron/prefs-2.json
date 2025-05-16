@@ -1,9 +1,8 @@
 {
   "user": {
-    "username": "Swole Wolf",
-    "userId": "810cb4b9-4278-4ecd-ada8-aaf6accedc8f",
-    "password": "test",
-    "name": "Loopy Fox"
+    "username": "newuser",
+    "userId": "78fc19d8-f580-4632-aa1b-149244604644",
+    "password": "asd"
   },
   "servers": [
     {
@@ -14,7 +13,7 @@
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#ff77bb",
+    "accentColor": "#856bf9",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true,
@@ -84,7 +83,7 @@
   "audio": {
     "inputGain": 1,
     "outputVolume": 0.8,
-    "hotMicThresh": 0.08,
+    "hotMicThresh": 0.07,
     "enableNoiseSuppression": true,
     "ringVolume": 0.5
   }

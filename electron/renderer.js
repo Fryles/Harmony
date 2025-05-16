@@ -3,6 +3,7 @@ var selectedServer = "HARMONY-FRIENDS-LIST";
 var selectedFriend;
 var currentChat;
 var localPrefs;
+var friendReqs = { incoming: [], outgoing: [] };
 var selfId;
 const dev = 1;
 
@@ -11,11 +12,8 @@ main();
 async function main() {
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
-	selectedFriend = localPrefs.friends[0];
-	selfId = dev ? crypto.randomUUID() : localPrefs.user.userId;
-	localPrefs.user.username = dev
-		? window.electronAPI.getPsuedoUser(selfId)
-		: localPrefs.user.username;
+
+	selfId = localPrefs.user.userId;
 
 	await webSocketInit();
 	rtc = new rtcInterface();
@@ -71,6 +69,12 @@ async function main() {
 	});
 
 	const friendsListObserver = new MutationObserver(() => {
+		if (localPrefs.friends) {
+			let firstFriend = document.getElementsByName(localPrefs.friends[0].id)[0];
+			if (firstFriend) {
+				selectFriend(firstFriend);
+			}
+		}
 		document.querySelectorAll(".friend-item").forEach((div) => {
 			div.addEventListener("click", selectFriend, true);
 		});
@@ -78,13 +82,6 @@ async function main() {
 	friendsListObserver.observe(document.getElementById("friends"), {
 		subtree: true,
 		childList: true,
-	});
-
-	document.querySelectorAll(".server-item").forEach((div) => {
-		div.addEventListener("click", selectServerItem, true);
-	});
-	document.querySelectorAll(".friend-item").forEach((div) => {
-		div.addEventListener("click", selectFriend, true);
 	});
 
 	document
@@ -121,19 +118,72 @@ async function webSocketInit() {
 
 function sendFriendReq(userId) {
 	console.log("sending fr for ", userId);
-	socket.emit("friendRequest", userId);
+	//update ui for loading
+	socket.emit("friendRequest", userId, (data) => {
+		if ((data.status = "awaiting")) {
+			console.log(data);
+			//check if we already have this request
+			let existingReq = friendReqs.outgoing.filter((r) => r.to == userId);
+			if (existingReq.length == 0) {
+				friendReqs.outgoing.push(data);
+			} else {
+				console.warn("Already have this request");
+			}
+		}
+	});
 }
 
 function checkFriendReqs() {
-	//should be run on init only
 	socket.on("friendRequestResponse", (request) => {
+		if (request.from != selfId) {
+			//got a response from a request we did not send
+			console.log("BAD ->>> got a response from a request we did not send");
+		}
 		//add friend
-		localPrefs.friends.push({
-			name: request.to == selfId ? request.from : request.to,
-			id: request.to == selfId ? request.from : request.to,
-			chat: request.chat,
-		});
-		updatePrefs();
+		if (request.status == "accepted") {
+			localPrefs.friends.push({
+				name: request.to,
+				id: request.to,
+				chat: request.chat,
+			});
+			window.electronAPI.updatePrefs(localPrefs);
+			//display toast/notif
+		} else {
+			//rejected :(
+		}
+		//update friend requests
+		//remove our acked friend request from friendReqs.outgoing
+		if (friendReqs.outgoing) {
+			friendReqs.outgoing = friendReqs.outgoing.filter(
+				(r) => r.to != request.to
+			);
+		}
+	});
+
+	socket.on("friendRequest", (request) => {
+		//got a friend request
+		console.log("got friend request", request);
+		if (request.from != selfId && request.to == selfId) {
+			//add to global friendReqs.incoming
+			if (!friendReqs.incoming) friendReqs.incoming = [];
+			//check if we already have this request
+			let existingReq = friendReqs.incoming.filter(
+				(r) => r.from == request.from
+			);
+			if (existingReq.length == 0) {
+				friendReqs.incoming.push(request);
+			} else {
+				console.warn("Already have this request");
+			}
+			//display toast/notif
+		}
+	});
+
+	socket.emit("checkFriendReqs", ({ incoming, outgoing }) => {
+		console.log(incoming, outgoing);
+		//store to global friendReqs
+		friendReqs.incoming = Array.isArray(incoming) ? incoming : [];
+		friendReqs.outgoing = Array.isArray(outgoing) ? outgoing : [];
 	});
 }
 
@@ -145,6 +195,7 @@ function sendChat(content) {
 	const msg = {
 		timestamp: Date.now(),
 		user: selfId,
+		username: localPrefs.user.username,
 		content: sanitizedContent,
 		channel: currentChat,
 	};
@@ -200,7 +251,12 @@ function updateChat(msg) {
 		un.classList.add("is-primary");
 		el.style = "text-align: end;";
 	}
+
+	let username = msg.username;
 	let sender = userLookup(msg.user);
+	if (username) {
+		sender.name = username;
+	}
 	un.innerHTML =
 		sender.nick != "" && sender.nick != undefined
 			? `${sender.nick} (${sender.name})`
@@ -265,32 +321,111 @@ async function changePass(newPass) {
 }
 
 function selectFriend(e) {
-	if (e.target.id == "friends-header" || e.target.id == "addFriendBtn") {
+	let el = e.target || e;
+	if (
+		el.id == "friends-header" ||
+		el.classList.contains("friends-menu-item") ||
+		el.classList.contains("no-fire")
+	) {
 		return;
 	}
 	//stop icons from tweaking out
-	if (e.target.tagName.toLowerCase() != "div") {
-		if (e.target.parentElement) {
-			e.target.parentElement.dispatchEvent(
-				new Event("click", { bubbles: true })
-			);
+	if (el.tagName.toLowerCase() != "div") {
+		if (el.parentElement) {
+			el.parentElement.dispatchEvent(new Event("click", { bubbles: true }));
 		}
 		return;
 	}
 	// Remove 'selected' class from all server items except the clicked one
 	document.querySelectorAll(".friend-item.selected").forEach((item) => {
-		if (item !== e.target) {
+		if (item !== el) {
 			item.classList.remove("selected");
 		}
 	});
 	// Add 'selected' class to the clicked server item
-	e.target.classList.add("selected");
-	selectedFriend = e.target.getAttribute("name");
+	el.classList.add("selected");
+	selectedFriend = el.getAttribute("name");
 	let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
 	if (privFriend && privFriend.chatId) {
 		displayChat(privFriend.chatId);
 	} else {
 		console.log("Error finding friend chat for ", selectedFriend);
+	}
+}
+
+function showFriendRequests(e) {
+	removeClassFromAll(".friends-menu-item > i", "active");
+	document.getElementById("friendRequestsViewBtn").classList.add("active");
+	const friendsContainer = document.getElementById("friends");
+	removeAllChildren(friendsContainer, ".friend-item", "friends-header");
+	removeAllChildren(friendsContainer, ".friend-request-item");
+
+	const requests = friendReqs.incoming || [];
+	if (requests.length === 0) {
+		const noReq = document.createElement("div");
+		noReq.className = "friend-request-item";
+		noReq.textContent = "No pending friend requests.";
+		friendsContainer.appendChild(noReq);
+	}
+
+	requests.forEach((req) => {
+		if (req.from == selfId) return;
+		const reqDiv = document.createElement("div");
+		reqDiv.className = "friend-request-item";
+		reqDiv.innerHTML = `
+			<span>${req.fromName || req.from}</span>
+			<span class="icon mr-1"><i class="accept-friend-request fas fa-xl fa-check"></i></span>
+			<span class="icon ml-1"><i class="reject-friend-request fas fa-xl fa-x"></i></span>
+		`;
+		reqDiv.querySelector(".accept-friend-request").onclick = () => {
+			socket.emit("friendRequestResponse", (req.status = "accepted"));
+			reqDiv.remove();
+			friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
+		};
+		reqDiv.querySelector(".reject-friend-request").onclick = () => {
+			socket.emit("friendRequestResponse", (req.status = "rejected"));
+			reqDiv.remove();
+			friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
+		};
+		friendsContainer.appendChild(reqDiv);
+	});
+
+	const outgoingReqs = friendReqs.outgoing || [];
+	if (outgoingReqs.length > 0) {
+		const outgoingDiv = document.createElement("div");
+		outgoingDiv.className =
+			"friend-request-item has-background-grey-dark has-text-white";
+		outgoingDiv.textContent = "Outgoing Friend Requests";
+		friendsContainer.appendChild(outgoingDiv);
+	}
+
+	outgoingReqs.forEach((req) => {
+		const reqDiv = document.createElement("div");
+		reqDiv.className = "friend-request-item";
+		reqDiv.innerHTML = `
+			<span>${req.toName || req.to}</span>
+			<span class="icon mx-1"><i class="reject-friend-request fas fa-xl fa-x"></i></span>
+		`;
+		reqDiv.querySelector(".reject-friend-request").onclick = () => {
+			socket.emit("cancelFriendRequest", { req });
+			reqDiv.remove();
+			friendReqs.outgoing = friendReqs.outgoing.filter((r) => r.to !== req.to);
+		};
+		friendsContainer.appendChild(reqDiv);
+	});
+}
+
+// Add showFriends function: restores the friends list view
+function showFriends(e) {
+	removeClassFromAll(".friends-menu-item > i", "active");
+	document.getElementById("friendsViewBtn").classList.add("active");
+
+	const friendsContainer = document.getElementById("friends");
+	removeAllChildren(friendsContainer, ".friend-request-item");
+	removeAllChildren(friendsContainer, ".friend-item", "friends-header");
+
+	if (localPrefs && Array.isArray(localPrefs.friends)) {
+		populateFriendsList(friendsContainer, localPrefs.friends, selectFriend);
 	}
 }
 
@@ -314,16 +449,13 @@ async function selectServerItem(e) {
 	e.target.classList.add("selected");
 	selectedServer = e.target.getAttribute("name");
 
-	//update friends tab and chat respectively
+	const friendsEl = document.getElementById("friends");
+	const chatEl = document.getElementById("chat");
+
 	if (selectedServer == "HARMONY-FRIENDS-LIST") {
-		document.getElementById("friends").style.display = "block";
-		document.getElementById("friends").style.borderWidth = "8px";
-		document.getElementById("friends").style.width = "calc-size(auto, size)";
-		document.getElementById("chat").style.width = "calc-size(auto, size)";
-		document.getElementById("friends-header").style.display = "block";
-		document.querySelectorAll(".friend-item").forEach((el) => {
-			el.style.display = "block";
-		});
+		friendsEl.classList.remove("slide-away");
+		chatEl.classList.remove("expand");
+
 		let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
 		if (privFriend && privFriend.chatId) {
 			displayChat(privFriend.chatId);
@@ -331,16 +463,8 @@ async function selectServerItem(e) {
 			console.log("Error finding friend chat for ", selectedFriend);
 		}
 	} else {
-		document.getElementById("friends").style.width = "0 !important";
-		document.getElementById("friends").style.borderWidth = "2px";
-		document.querySelectorAll(".friend-item").forEach((el) => {
-			el.style.display = "none";
-		});
-		document.getElementById("friends-header").style.display = "none";
-		document.getElementById("chat").style.width = "100%";
-		setTimeout(() => {
-			document.getElementById("friends").style.display = "none";
-		}, 300);
+		friendsEl.classList.add("slide-away");
+		chatEl.classList.add("expand");
 
 		let privServer = localPrefs.servers.find((f) => f.id == selectedServer);
 		if (
@@ -370,22 +494,19 @@ function userLookup(userId) {
 }
 
 async function storePrefs() {
-	//get prefs from HTML, then store, and load them to our ui
 	localPrefs = await window.electronAPI.getPrefs();
-	// Settings
+	const getVal = (id) => document.getElementById(id).value;
+	const getChk = (id) => document.getElementById(id).checked;
+
 	const accentColorEl = document.getElementById("accentColor");
-	const accentColorValue = accentColorEl.value;
-	if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(accentColorValue)) {
+	if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(accentColorEl.value)) {
 		validateField(accentColorEl);
 		return;
 	}
-	localPrefs.settings.accentColor = accentColorValue;
+	localPrefs.settings.accentColor = accentColorEl.value;
+	localPrefs.settings.theme = getVal("theme");
+	localPrefs.settings.notifications = getChk("notifications");
 
-	localPrefs.settings.theme = document.getElementById("theme").value;
-	localPrefs.settings.notifications =
-		document.getElementById("notifications").checked;
-
-	// Username
 	const usernameEl = document.getElementById("username");
 	if (!usernameEl.value) {
 		validateField(usernameEl);
@@ -393,53 +514,28 @@ async function storePrefs() {
 	}
 	localPrefs.user.username = usernameEl.value;
 
-	// Password
 	const passwordEl = document.getElementById("password");
 	if (!passwordEl.value) {
 		validateField(passwordEl);
 		return;
 	}
-	if (passwordEl.value !== localPrefs.user.password) {
+	if (passwordEl.value !== localPrefs.user.password)
 		changePass(passwordEl.value);
-	}
 
-	// Devices
-	const getSelectedDevice = (selectId, devices) => {
-		const select = document.getElementById(selectId);
-		const deviceId = select.value;
-		return devices.find((d) => d.deviceId === deviceId) || null;
-	};
-	localPrefs.devices.videoInputDevice = getSelectedDevice(
-		"videoInputDevice",
-		localPrefs.devices.videoInputDevices
-	);
-	localPrefs.devices.audioInputDevice = getSelectedDevice(
-		"audioInputDevice",
-		localPrefs.devices.audioInputDevices
-	);
-	localPrefs.devices.audioOutputDevice = getSelectedDevice(
-		"audioOutputDevice",
-		localPrefs.devices.audioOutputDevices
+	["videoInputDevice", "audioInputDevice", "audioOutputDevice"].forEach(
+		(id) => {
+			localPrefs.devices[id] = getSelectedDevice(
+				id,
+				localPrefs.devices[id + "s"]
+			);
+		}
 	);
 
-	// Audio
-	localPrefs.audio.inputGain = parseFloat(
-		document.getElementById("inputGain").value
-	);
-	localPrefs.audio.outputVolume = parseFloat(
-		document.getElementById("outputVolume").value
-	);
-	localPrefs.audio.hotMicThresh = parseFloat(
-		document.getElementById("hotMicThresh").value
-	);
-	localPrefs.audio.ringVolume = parseFloat(
-		document.getElementById("ringVolume").value
-	);
-	localPrefs.audio.enableNoiseSuppression = document.getElementById(
-		"enableNoiseSuppression"
-	).checked;
+	["inputGain", "outputVolume", "hotMicThresh", "ringVolume"].forEach((id) => {
+		localPrefs.audio[id] = parseFloat(getVal(id));
+	});
+	localPrefs.audio.enableNoiseSuppression = getChk("enableNoiseSuppression");
 
-	// Save and reload
 	window.electronAPI.updatePrefs(localPrefs);
 }
 
@@ -492,4 +588,39 @@ function closeModals() {
 	if (!rtc.mediaChannel) {
 		rtc.stopLocalVoice();
 	}
+}
+
+// Utility: Remove a class from all elements matching selector
+function removeClassFromAll(selector, className) {
+	document
+		.querySelectorAll(selector)
+		.forEach((el) => el.classList.remove(className));
+}
+
+// Utility: Remove all children matching selector from parent
+function removeAllChildren(parent, selector, exceptId) {
+	parent.querySelectorAll(selector).forEach((item) => {
+		if (!exceptId || item.id !== exceptId) item.remove();
+	});
+}
+
+// Utility: Repopulate friends list
+function populateFriendsList(container, friends, clickHandler) {
+	friends.forEach((friend) => {
+		const friendDiv = document.createElement("div");
+		friendDiv.className = "friend-item";
+		friendDiv.setAttribute("name", friend.id);
+		friendDiv.textContent = friend.nick
+			? `${friend.nick} (${friend.name})`
+			: friend.name;
+		friendDiv.addEventListener("click", clickHandler, true);
+		container.appendChild(friendDiv);
+	});
+}
+
+// Utility: Get selected device from select element
+function getSelectedDevice(selectId, devices) {
+	const select = document.getElementById(selectId);
+	const deviceId = select.value;
+	return devices.find((d) => d.deviceId === deviceId) || null;
 }

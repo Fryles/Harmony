@@ -55,6 +55,14 @@ class rtcInterface {
 						"bad typed channel coming back from server... its confused."
 					);
 				}
+				//add channel to peer
+				const pc = this.peerConnections[peerId];
+				if (pc) {
+					pc.channels = pc.channels || [];
+					if (!pc.channels.includes(data.channel)) {
+						pc.channels.push(data.channel);
+					}
+				}
 			});
 		});
 

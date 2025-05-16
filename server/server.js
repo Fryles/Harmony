@@ -19,7 +19,7 @@ const io = new socketio(server, { cors: {} });
 
 // DB
 const db = await JSONFilePreset("db.json", {
-	requests: {},
+	requests: [],
 	users: {},
 	ips: {},
 	servers: {},
@@ -312,15 +312,90 @@ io.on("connection", (socket) => {
 		// No outgoing or incoming, create new request
 		const fr = {
 			from: userId,
+			fromName: db.data.users[userId].name,
 			to: friend,
+			toName: db.data.users[friend].name,
 			chat: crypto.randomBytes(24).toString("hex"),
 			time: Date.now(),
 			status: "awaiting",
 		};
 
 		db.data.requests.push(fr);
-		await db.data.requests.write();
+		await db.write();
 		if (callback) callback(fr);
+
+		// Emit friendRequest to the target peer if possible
+		const toPeer = connections[friend];
+		if (toPeer) {
+			io.to(toPeer.socketId).emit("friendRequest", fr);
+		}
+	});
+
+	socket.on("friendRequestResponse", async (req) => {
+		console.log(req);
+
+		const userId = socket.handshake.auth.userId;
+		const requests = db.data.requests;
+		const idx = requests.findIndex(
+			(r) => r.from === req.from && r.to === userId
+		);
+		if (idx !== -1) {
+			if (req.status === "accepted") {
+				requests[idx].status = "accepted";
+			} else if (req.status === "rejected") {
+				requests[idx].status = "rejected";
+			}
+			//see if the sender is online
+			const sender = connections[req.from];
+			if (sender) {
+				//send the sender the response
+				io.to(sender.socketId).emit("friendRequestResponse", req);
+				requests[idx].status = "recieved";
+				await db.write();
+			} else {
+				//sender is offline, just update the request
+				await db.write();
+			}
+		} else {
+			console.log("Request not found");
+		}
+	});
+
+	socket.on("checkFriendReqs", async (callback) => {
+		const userId = socket.handshake.auth.userId;
+		const incoming = db.data.requests.filter(
+			(r) => r.to === userId && r.status != "recieved"
+		);
+		const outgoing = db.data.requests.filter(
+			(r) => r.from === userId && r.status != "recieved"
+		);
+
+		//since we are sending client their outgoing requests, any accepted/rejected should be updated to recieved
+		let updated = false;
+		for (const req of outgoing) {
+			if (req.status === "accepted" || req.status === "rejected") {
+				req.status = "BUHHUG";
+				updated = true;
+			}
+		}
+		if (updated) {
+			await db.write();
+		}
+		callback({ incoming, outgoing });
+	});
+
+	socket.on("cancelFriendRequest", async (req) => {
+		const userId = socket.handshake.auth.userId;
+		const requests = db.data.requests;
+		const idx = requests.findIndex(
+			(r) => r.from === userId && r.to === req.to && r.status === "awaiting"
+		);
+		if (idx !== -1) {
+			requests.splice(idx, 1);
+			await db.write();
+		} else {
+			console.log("Request not found or already accepted/rejected");
+		}
 	});
 
 	socket.on("changePass", async (newSecret, callback) => {

@@ -46,10 +46,11 @@ app.on("window-all-closed", function () {
 	if (process.platform !== "darwin") app.quit(); //win32 for windows
 });
 
-function getPrefs() {
+function getPrefs(event, windowId) {
 	try {
-		//get prefs from fs
-		const prefsPath = path.join(__dirname, "prefs.json");
+		// Use windowId to determine prefs path
+		const id = windowId || (event && event.sender && event.sender.id);
+		const prefsPath = path.join(__dirname, `prefs-${id}.json`);
 		if (fs.existsSync(prefsPath)) {
 			const prefs = fs.readFileSync(prefsPath);
 			return JSON.parse(prefs);
@@ -62,7 +63,7 @@ function getPrefs() {
 	}
 }
 
-function updatePrefs(event, prefs) {
+function updatePrefs(event, prefs, windowId) {
 	// Validate that prefs is an object
 	if (prefs === "" || typeof prefs !== "object" || prefs === undefined) {
 		console.error("Invalid preferences format");
@@ -72,8 +73,8 @@ function updatePrefs(event, prefs) {
 	// Remove any undefined or function values
 	prefs = JSON.parse(JSON.stringify(prefs));
 
-	// Update the prefs.json file with the new preferences
-
-	const prefsPath = path.join(__dirname, "prefs.json");
+	// Use windowId to determine prefs path
+	const id = windowId || (event && event.sender && event.sender.id);
+	const prefsPath = path.join(__dirname, `prefs-${id}.json`);
 	fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2));
 }
