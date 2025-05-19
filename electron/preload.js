@@ -55,7 +55,15 @@ function loadServers(prefs) {
 		let el = document.createElement("div");
 		el.classList.add("server-item");
 		el.setAttribute("name", server.id);
-		el.innerHTML = server.name;
+		let name = server.name;
+		if (name.includes(" ") && name.length > 5) {
+			//split two part name into two 2 char initials
+			name = name.split(" ");
+			name = name[0].substring(0, 2) + " " + name[1].substring(0, 2);
+		} else if (name.length > 5) {
+			name = name.substring(0, 5);
+		}
+		el.innerText = name;
 		document.getElementById("server-list").appendChild(el);
 	});
 

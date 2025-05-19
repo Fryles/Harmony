@@ -6,7 +6,6 @@ import cors from "cors";
 import sirv from "sirv";
 import { JSONFilePreset } from "lowdb/node";
 import crypto from "crypto";
-import { json } from "stream/consumers";
 
 // ENVIRONMENT VARIABLES
 const PORT = process.env.PORT || 3000;
@@ -36,7 +35,7 @@ const db = await JSONFilePreset("db.json", {
 //ips keeps fraud account registering in check. only 420 accountRegisters per IP
 //ips, ip: numRegs
 
-//servers tracks server message history (if enabled on creation)
+//servers stores data for lookup, admin privs (pwd change, etc.), and message history (if enabled on creation)
 //servers, {key:[{msgObj}...]}
 
 // AUTHENTICATION MIDDLEWARE
@@ -389,6 +388,8 @@ io.on("connection", (socket) => {
 		}
 		callback({ incoming, outgoing });
 	});
+
+	socket.on("serverQuery", async (server, callback) => {});
 
 	socket.on("cancelFriendRequest", async (req) => {
 		const userId = socket.handshake.auth.userId;

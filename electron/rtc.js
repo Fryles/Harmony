@@ -568,6 +568,7 @@ class rtcInterface {
 					dc.send(JSON.stringify(msg));
 				} else {
 					console.log(`message not sent to ${peerId}`);
+					showToast("Error sending msg...");
 				}
 			}
 		});
@@ -797,7 +798,7 @@ class rtcInterface {
 			updateGainBasedOnAmplitude();
 		} catch (err) {
 			console.error("Could not get local audio:", err);
-			//alert("could not find audio device specified in settings");
+			showToast("Missing Audio Input Device");
 		}
 	}
 }
@@ -831,9 +832,11 @@ function addVoiceUser(userId) {
 	} else if (name.length > 5) {
 		name = name.substring(0, 5);
 	}
-	voiceUser.innerHTML = name;
+	voiceUser.innerHTML = DOMPurify.sanitize(name);
 	voiceUser.id = userId;
-	voiceUser.onclick = function (e) {};
+	voiceUser.onclick = function (e) {
+		//TODO
+	};
 	document.getElementById("voice-list").appendChild(voiceUser);
 	//add talking animation
 	if (userId == selfId) visualizeBorderWithAudio(rtc.localAudioStream, userId);

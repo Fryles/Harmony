@@ -89,14 +89,69 @@
           <p class="control has-icons-right">
             <input class="input is-rounded" id="chat-input" type="text" placeholder="Type a message..."
               onkeydown="if(event.key==='Enter'){sendChat(this.value); this.value='';}" />
-            <span id="sendBtn" class="icon is-right is-clickable"
+            <span id="sendBtn" class="icon is-right is-clickable mr-1"
               onclick="const input=this.previousElementSibling;sendChat(input.value);input.value='';">
-              <i class="fas fa-md fa-paper-plane"></i>
+              <i class="fas fa-lg fa-paper-plane"></i>
             </span>
           </p>
         </div>
       </div>
 
+    </div>
+  </div>
+
+
+  <!-- Add Server Modal -->
+  <div class="modal" id="add-server-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+      <header class="modal-card-head has-background-primary-soft has-text-primary-soft-invert py-4">
+        <p class="modal-card-title">Add Server</p>
+        <button class="delete is-large" aria-label="close"></button>
+      </header>
+      <section class="modal-card-body">
+        <div class="field">
+          <label class="label">Server Name</label>
+          <div class="control">
+            <input class="input" type="text" id="serverNameInput" placeholder="Enter server name">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Password</label>
+          <div class="control">
+            <input class="input" type="password" id="serverPasswordInput" placeholder="Enter server password">
+          </div>
+        </div>
+        <div class="field">
+          <label class="checkbox">
+            <input type="checkbox" id="serverOpen">
+            Open <span class="tag is-primary">Your server will not require a password, anyone with the server name can
+              join.</span>
+          </label>
+        </div>
+        <div class="field">
+          <label class="checkbox">
+            <input type="checkbox" id="serverUnlisted">
+            Unlisted
+          </label>
+          <span class="tag is-primary">Your server will not be publicly searchable. This does not stop any
+            joining.</span>
+        </div>
+        <div class="field">
+          <label class="checkbox">
+            <input type="checkbox" id="serverStoredMessaging" checked>
+            Stored Messaging <span class="tag is-primary">Stores 100 msgs, if not on, messages will
+              only be delivered to online
+              peers.</span>
+          </label>
+        </div>
+      </section>
+      <footer class="modal-card-foot">
+        <div class="buttons">
+          <button class="button is-primary" id="add-server">Add Server</button>
+          <button class="button close">Cancel</button>
+        </div>
+      </footer>
     </div>
   </div>
 
@@ -139,6 +194,7 @@
       </footer>
     </div>
   </div>
+
   <!-- Friends Modal -->
   <div class="modal" id="friendreq-modal">
     <div class="modal-background"></div>

@@ -378,6 +378,15 @@ div.modal-background {
 	background-color: rgba(0, 0, 0, 0.3);
 	backdrop-filter: blur(8px);
 }
+#sendBtn {
+	color: var(--bulma-primary);
+	transition: all 0.3s ease;
+}
+#sendBtn:hover {
+	transform: scale(1.1);
+	filter: drop-shadow(0 0 3px var(--bulma-primary));
+}
+
 #friendreq-modal-card {
 	width: 90%;
 	max-width: 400px;
@@ -389,4 +398,20 @@ div.modal-background {
 }
 .modal-card-head {
 	box-shadow: none;
+}
+.notification {
+	padding: 0.5em;
+	position: fixed;
+	left: 50%;
+	opacity: 0;
+	box-shadow: 0 5px 10px 3px rgba(0, 0, 0, 0.4);
+}
+.notification:hover {
+	opacity: 1 !important;
+}
+.toastClose {
+	transition: all 0.3s ease;
+}
+.toastClose:hover {
+	transform: scale(1.1);
 }

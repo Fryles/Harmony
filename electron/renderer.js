@@ -7,6 +7,9 @@ var friendReqs = { incoming: [], outgoing: [] };
 var selfId;
 const dev = 1;
 
+// Global for stacking toasts
+let toastStackHeight = 0;
+
 main();
 
 async function main() {
@@ -110,10 +113,11 @@ async function main() {
 						window.electronAPI.updatePrefs(localPrefs);
 						//update friend list
 						div.innerHTML = "";
-						div.innerHTML =
+						div.innerHTML = DOMPurify.sanitize(
 							friend.nick != "" && friend.nick != undefined
 								? `${friend.nick} (${friend.name})`
-								: friend.name;
+								: friend.name
+						);
 						div.appendChild(manageBtn);
 						div.setAttribute("name", friend.id);
 						div.onclick = selectFriend;
@@ -140,6 +144,12 @@ async function main() {
 	document
 		.getElementById("voice-call")
 		.addEventListener("click", () => rtc.callVoice(currentChat));
+
+	document.getElementById("serverOpen").addEventListener("change", (e) => {
+		const pwdInput = document.getElementById("serverPasswordInput");
+		pwdInput.value = e.target.checked ? "" : pwdInput.value;
+		pwdInput.disabled = e.target.checked;
+	});
 }
 
 async function webSocketInit() {
@@ -169,20 +179,26 @@ async function webSocketInit() {
 function sendFriendReq(userId) {
 	if (localPrefs.friends.filter((f) => f.id == userId).length > 0) {
 		//already friends
-		//show toast/notif
+		showToast("Already Friends With This User");
 		return;
 	}
 	if (friendReqs.outgoing.filter((r) => r.to == userId).length > 0) {
 		//already sent req
-		//show toast/notif
+		showToast("Already Sent Request");
 		return;
 	}
 	if (userId == selfId) {
 		//can't send friend request to self
-		//show toast/notif
+		showToast("You ur own best fran og");
 		return;
 	}
-	//TODO add validation for uuid
+	const uuidv4Regex =
+		/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+	if (!uuidv4Regex.test(userId)) {
+		showToast("Invalid User ID (must be UUIDv4)");
+		return;
+	}
+
 	console.log("sending fr for ", userId);
 	//update ui for loading
 	socket.emit("friendRequest", userId, (data) => {
@@ -198,7 +214,7 @@ function sendFriendReq(userId) {
 		}
 	});
 	closeModals();
-	//show toast/notif
+	showToast("Sent Friend Request");
 	document.getElementById("friendIdInput").value = "";
 }
 
@@ -318,7 +334,7 @@ function displayChat(chatId) {
 function updateChat(msg) {
 	//add msg to chat
 	if (!msg || !msg.user || !msg.content) {
-		console.log("bad msg");
+		showToast("I'm Not Sending That!");
 		return;
 	}
 	// Remove all id attributes and sanitize from msg.content
@@ -338,10 +354,11 @@ function updateChat(msg) {
 	if (username) {
 		sender.name = username;
 	}
-	un.innerHTML =
+	un.innerHTML = DOMPurify.sanitize(
 		sender.nick != "" && sender.nick != undefined
 			? `${sender.nick} (${sender.name})`
-			: sender.name;
+			: sender.name
+	);
 	el.innerHTML = "";
 	el.appendChild(un);
 	el.innerHTML += "<br>" + sanitizedContent;
@@ -454,13 +471,13 @@ function showFriendRequests(e) {
 		const reqDiv = document.createElement("div");
 		reqDiv.className = "friend-request-item";
 		reqDiv.innerHTML = `
-			<span>${req.fromName || req.from}</span>
+			<span>${DOMPurify.sanitize(req.fromName || req.from)}</span>
 			<span>
 			<span class="icon mx-1"><i class="accept-friend-request fas fa-xl fa-check-circle"></i></span>
 			<span class="icon ml-1"><i class="reject-friend-request fas fa-xl fa-circle-xmark"></i></span>
 			</span>
 		`;
-		reqDiv.setAttribute("reqFrom", req.from);
+		reqDiv.setAttribute("reqFrom", DOMPurify.sanitize(req.from));
 		reqDiv.querySelector(".accept-friend-request").onclick = () => {
 			req.status = "accepted";
 			socket.emit("friendRequestResponse", req);
@@ -497,7 +514,7 @@ function showFriendRequests(e) {
 		const reqDiv = document.createElement("div");
 		reqDiv.className = "friend-request-item";
 		reqDiv.innerHTML = `
-			<span>${req.toName || req.to}</span>
+			<span>${DOMPurify.sanitize(req.toName || req.to)}</span>
 			<span class="icon mx-1"><i class="reject-friend-request fas fa-xl fa-circle-xmark"></i></span>
 		`;
 		reqDiv.querySelector(".reject-friend-request").onclick = () => {
@@ -532,6 +549,12 @@ async function selectServerItem(e) {
 		}
 		return;
 	}
+	selectedServer = e.target.getAttribute("name");
+	if (selectedServer == "HARMONY-ADD-SERVER") {
+		//open add server modal
+		openModal("add-server-modal");
+		return;
+	}
 	// Remove 'selected' class from all server items except the clicked one
 	document.querySelectorAll(".server-item.selected").forEach((item) => {
 		if (item !== e.target) {
@@ -540,7 +563,6 @@ async function selectServerItem(e) {
 	});
 	// Add 'selected' class to the clicked server item
 	e.target.classList.add("selected");
-	selectedServer = e.target.getAttribute("name");
 
 	const friendsEl = document.getElementById("friends");
 	const chatEl = document.getElementById("chat");
@@ -702,10 +724,10 @@ function populateFriendsList(container, friends, clickHandler) {
 	friends.forEach((friend) => {
 		const friendDiv = document.createElement("div");
 		friendDiv.className = "friend-item";
-		friendDiv.setAttribute("name", friend.id);
-		friendDiv.textContent = friend.nick
-			? `${friend.nick} (${friend.name})`
-			: friend.name;
+		friendDiv.setAttribute("name", DOMPurify.sanitize(friend.id));
+		friendDiv.textContent = DOMPurify.sanitize(
+			friend.nick ? `${friend.nick} (${friend.name})` : friend.name
+		);
 		friendDiv.addEventListener("click", clickHandler, true);
 		container.appendChild(friendDiv);
 	});
@@ -716,4 +738,87 @@ function getSelectedDevice(selectId, devices) {
 	const select = document.getElementById(selectId);
 	const deviceId = select.value;
 	return devices.find((d) => d.deviceId === deviceId) || null;
+}
+
+function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
+	const toast = document.createElement("div");
+	toast.className = `notification ${color}`;
+	const baseTop = 0.5; // rem
+	const stackOffset = toastStackHeight * 3; // 4rem per toast
+	toast.style.position = "absolute";
+	toast.style.left = "50%";
+	toast.style.top = `calc(${baseTop}rem + ${stackOffset}rem)`;
+	toast.style.transform = "translate(-50%, -100%)";
+	toast.style.transition =
+		"transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s";
+	toast.style.zIndex = 9999;
+	toast.style.minWidth = "20px";
+	toast.innerHTML = `
+		${DOMPurify.sanitize(
+			msg
+		)}<button class="toastClose ml-2 mr-1"><span class="icon is-small">
+      <i class="fas fa-xmark"></i>
+    </span></button>
+	`;
+	toast.querySelector(".toastClose").onclick = () => {
+		// Animate stow
+		toast.style.transform = "translate(-50%, -100%)";
+		toast.style.opacity = "0";
+		setTimeout(() => {
+			toast.remove();
+			toastStackHeight = Math.max(0, toastStackHeight - 1);
+			// Re-stack remaining toasts
+			document.querySelectorAll(".notification").forEach((el, idx) => {
+				// Animate top property for smooth re-stack
+				el.style.transition =
+					"top 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s";
+				el.style.top = `calc(${baseTop}rem + ${idx * 3}rem)`;
+			});
+		}, 300);
+	};
+
+	if (typeof onclick == "function") {
+		toast.classList.add("is-clickable");
+		toast.addEventListener("click", function (e) {
+			// Prevent click on close button from triggering onclick
+			if (e.target.closest(".toastClose")) return;
+			onclick(e);
+		});
+	}
+	// Instead of document.body, append to #chat
+	const chatDiv = document.getElementById("chat");
+	const activemodal = document.querySelector(".modal.is-active");
+	if (activemodal) {
+		activemodal.appendChild(toast);
+	} else if (chatDiv) {
+		chatDiv.appendChild(toast);
+		chatDiv.style.position = "relative"; // Ensure #chat is positioned
+	} else {
+		document.body.appendChild(toast); // fallback
+	}
+
+	// Animate drop down
+	setTimeout(() => {
+		toast.style.transform = "translate(-50%, 0)";
+		toast.style.opacity = "0.8";
+	}, 10);
+
+	toastStackHeight++;
+
+	setTimeout(() => {
+		// Animate stow
+		toast.style.transform = "translate(-50%, -100%)";
+		toast.style.opacity = "0";
+		setTimeout(() => {
+			toast.remove();
+			toastStackHeight = Math.max(0, toastStackHeight - 1);
+			// Re-stack remaining toasts
+			document.querySelectorAll(".notification").forEach((el, idx) => {
+				// Animate top property for smooth re-stack
+				el.style.transition =
+					"top 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s";
+				el.style.top = `calc(${baseTop}rem + ${idx * 3}rem)`;
+			});
+		}, 300);
+	}, timeout);
 }
