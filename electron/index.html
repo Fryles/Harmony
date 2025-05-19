@@ -100,10 +100,49 @@
     </div>
   </div>
 
+  <!-- Manage Friend Modal -->
+  <div class="modal" id="manage-friend-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+      <header class="modal-card-head has-background-primary-soft has-text-primary-soft-invert py-4">
+        <p class="modal-card-title">Manage Friend</p>
+        <button class="delete is-large" aria-label="close"></button>
+      </header>
+      <section class="modal-card-body">
+        <div class="field">
+          <label class="label">Friend's ID</label>
+          <div class="control">
+            <input class="input" type="text" id="friendManageIdInput" placeholder="" disabled style="width: 75%;">
+            <span class="tag is-primary is-hoverable is-large" style="width: 20%;"
+              onclick="navigator.clipboard.writeText(document.getElementById('friendManageIdInput').value);this.innerText='Copied!';setTimeout((e)=> e.innerText='Copy',3000,this)">Copy</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Nickname</label>
+          <div class="control">
+            <input class="input" type="text" id="friendNickInput" placeholder="Enter a nickname">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">Name</label>
+          <div class="control">
+            <input class="input" type="text" id="friendNameInput" placeholder="Enter friend's name">
+          </div>
+        </div>
+      </section>
+      <footer class="modal-card-foot">
+        <div class="buttons">
+          <button class="button is-primary" id="manage-friend-save">Save</button>
+          <button class="button close">Cancel</button>
+          <button class="button is-danger" id="manage-friend-remove">Remove Friend</button>
+        </div>
+      </footer>
+    </div>
+  </div>
   <!-- Friends Modal -->
   <div class="modal" id="friendreq-modal">
     <div class="modal-background"></div>
-    <div class="modal-card">
+    <div class="modal-card" id="friendreq-modal-card">
       <header class="modal-card-head has-background-primary-soft has-text-primary-soft-invert py-4">
         <p class="modal-card-title">Add Friend</p>
         <button class="delete is-large" aria-label="close"></button>

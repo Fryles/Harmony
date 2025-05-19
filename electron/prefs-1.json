@@ -1,90 +1,90 @@
 {
-  "user": {
-    "username": "Lazy Elephant",
-    "userId": "da967034-e08a-4d8f-b377-8bf1df9ff1ac",
-    "password": "asdasd"
-  },
-  "servers": [
-    {
-      "name": "pub",
-      "id": 123,
-      "password": ""
-    }
-  ],
-  "settings": {
-    "theme": "dark",
-    "accentColor": "#856bf9",
-    "language": "en-US",
-    "notifications": true,
-    "checkUpdate": true,
-    "maxMsgHistory": 50
-  },
-  "friends": [
-    {
-      "name": "buh",
-      "nick": "",
-      "id": "whatmybabysaid",
-      "chatId": "BUHCHAT"
-    }
-  ],
-  "devices": {
-    "videoInputDevices": [],
-    "audioInputDevices": [
-      {
-        "deviceId": "default",
-        "kind": "audioinput",
-        "label": "Default - Myle pods (Bluetooth)"
-      },
-      {
-        "deviceId": "adf1b2698ded844dd38ce591bece70345f9ce083098778a8f834d094394c6958",
-        "kind": "audioinput",
-        "label": "Myle pods (Bluetooth)"
-      }
-    ],
-    "audioOutputDevices": [
-      {
-        "deviceId": "default",
-        "kind": "audiooutput",
-        "label": "Default - Myle pods (Bluetooth)"
-      },
-      {
-        "deviceId": "74d3fbc1b8fd13c66557e0c4e8e96fbb86c78c5aec9bbfcdc7df632944081459",
-        "kind": "audiooutput",
-        "label": "Myle pods (Bluetooth)"
-      },
-      {
-        "deviceId": "8c9f8879e73bbe41a62d6b46974c8207e5f5f195a7a027f6c4cb34ffe2301d19",
-        "kind": "audiooutput",
-        "label": "HP 24mh (HDMI)"
-      },
-      {
-        "deviceId": "3ba3c3d25cf966eed55eb5a85c028eb87a86a5ac1b23e578c1c70fd9411a28a7",
-        "kind": "audiooutput",
-        "label": "HP 24mh (DisplayPort)"
-      },
-      {
-        "deviceId": "1e1ef80854158af93f92a9a18ea1cff347d2b738ec9f701f26dcf0bd72fb9798",
-        "kind": "audiooutput",
-        "label": "Mac mini Speakers (Built-in)"
-      }
-    ],
-    "audioInputDevice": {
-      "deviceId": "default",
-      "kind": "audioinput",
-      "label": "Default - Myle pods (Bluetooth)"
-    },
-    "audioOutputDevice": {
-      "deviceId": "default",
-      "kind": "audiooutput",
-      "label": "Default - Myle pods (Bluetooth)"
-    },
-    "videoInputDevice": null
-  },
-  "audio": {
-    "inputGain": 1,
-    "outputVolume": 0.8,
-    "hotMicThresh": 0.04,
-    "enableNoiseSuppression": true,
-    "ringVolume": 0.5
-  }
+	"user": {
+		"username": "Lazy Elephant",
+		"userId": "da967034-e08a-4d8f-b377-8bf1df9ff1ac",
+		"password": "asdasd"
+	},
+	"servers": [
+		{
+			"name": "pub",
+			"id": 123,
+			"password": ""
+		}
+	],
+	"settings": {
+		"theme": "dark",
+		"accentColor": "#856bf9",
+		"language": "en-US",
+		"notifications": true,
+		"checkUpdate": true,
+		"maxMsgHistory": 50
+	},
+	"friends": [
+		{
+			"name": "buh",
+			"nick": "",
+			"id": "whatmybabysaid",
+			"chat": "BUHCHAT"
+		}
+	],
+	"devices": {
+		"videoInputDevices": [],
+		"audioInputDevices": [
+			{
+				"deviceId": "default",
+				"kind": "audioinput",
+				"label": "Default - Myle pods (Bluetooth)"
+			},
+			{
+				"deviceId": "adf1b2698ded844dd38ce591bece70345f9ce083098778a8f834d094394c6958",
+				"kind": "audioinput",
+				"label": "Myle pods (Bluetooth)"
+			}
+		],
+		"audioOutputDevices": [
+			{
+				"deviceId": "default",
+				"kind": "audiooutput",
+				"label": "Default - Myle pods (Bluetooth)"
+			},
+			{
+				"deviceId": "74d3fbc1b8fd13c66557e0c4e8e96fbb86c78c5aec9bbfcdc7df632944081459",
+				"kind": "audiooutput",
+				"label": "Myle pods (Bluetooth)"
+			},
+			{
+				"deviceId": "8c9f8879e73bbe41a62d6b46974c8207e5f5f195a7a027f6c4cb34ffe2301d19",
+				"kind": "audiooutput",
+				"label": "HP 24mh (HDMI)"
+			},
+			{
+				"deviceId": "3ba3c3d25cf966eed55eb5a85c028eb87a86a5ac1b23e578c1c70fd9411a28a7",
+				"kind": "audiooutput",
+				"label": "HP 24mh (DisplayPort)"
+			},
+			{
+				"deviceId": "1e1ef80854158af93f92a9a18ea1cff347d2b738ec9f701f26dcf0bd72fb9798",
+				"kind": "audiooutput",
+				"label": "Mac mini Speakers (Built-in)"
+			}
+		],
+		"audioInputDevice": {
+			"deviceId": "default",
+			"kind": "audioinput",
+			"label": "Default - Myle pods (Bluetooth)"
+		},
+		"audioOutputDevice": {
+			"deviceId": "default",
+			"kind": "audiooutput",
+			"label": "Default - Myle pods (Bluetooth)"
+		},
+		"videoInputDevice": null
+	},
+	"audio": {
+		"inputGain": 1,
+		"outputVolume": 0.8,
+		"hotMicThresh": 0.04,
+		"enableNoiseSuppression": true,
+		"ringVolume": 0.5
+	}
 }

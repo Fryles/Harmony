@@ -13,7 +13,7 @@
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#856bf9",
+    "accentColor": "#ff9999",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true,
@@ -24,7 +24,7 @@
       "name": "buh",
       "nick": "",
       "id": "whatmybabysaid",
-      "chatId": "BUHCHAT"
+      "chat": "BUHCHAT"
     }
   ],
   "devices": {
@@ -68,11 +68,7 @@
         "label": "Mac mini Speakers (Built-in)"
       }
     ],
-    "audioInputDevice": {
-      "deviceId": "default",
-      "kind": "audioinput",
-      "label": "Default - Myle pods (Bluetooth)"
-    },
+    "audioInputDevice": null,
     "audioOutputDevice": {
       "deviceId": "default",
       "kind": "audiooutput",
@@ -81,10 +77,10 @@
     "videoInputDevice": null
   },
   "audio": {
-    "inputGain": 1,
-    "outputVolume": 0.8,
+    "inputGain": 0.87,
+    "outputVolume": 0.66,
     "hotMicThresh": 0.07,
     "enableNoiseSuppression": true,
-    "ringVolume": 0.5
+    "ringVolume": 0.43
   }
 }

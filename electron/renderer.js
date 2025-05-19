@@ -49,8 +49,8 @@ async function main() {
 				if (target == "settings-modal") {
 					if (!rtc.localAudioStream) {
 						await rtc._initLocalAudio();
-						colorSliderWithAudio(rtc.unProcessedLocalAudio, "hotMicThresh");
-					} else {
+					}
+					if (rtc.localAudioStream) {
 						colorSliderWithAudio(rtc.unProcessedLocalAudio, "hotMicThresh");
 					}
 				}
@@ -77,6 +77,56 @@ async function main() {
 		}
 		document.querySelectorAll(".friend-item").forEach((div) => {
 			div.addEventListener("click", selectFriend, true);
+			//add manage friend button if not already present
+			if (div.querySelector(".icon")) {
+				return;
+			}
+			let manageBtn = document.createElement("span");
+			manageBtn.className = "icon mx-1";
+			manageBtn.innerHTML = "<i class='fas fa-xl fa-cog'></i>";
+			manageBtn.onclick = (e) => {
+				e.stopPropagation();
+				let friendId = div.getAttribute("name");
+				let friend = localPrefs.friends.find((f) => f.id == friendId);
+				if (friend) {
+					document.getElementById("friendManageIdInput").value = friendId;
+					document.getElementById("friendNickInput").value = friend.nick || "";
+					document.getElementById("friendNameInput").value = friend.name || "";
+					//open modal
+					openModal("manage-friend-modal");
+					document.getElementById("manage-friend-remove").onclick = () => {
+						//remove friend from local prefs
+						localPrefs.friends = localPrefs.friends.filter(
+							(f) => f.id != friendId
+						);
+						window.electronAPI.updatePrefs(localPrefs);
+						//remove from ui
+						div.remove();
+						closeModals();
+					};
+					document.getElementById("manage-friend-save").onclick = () => {
+						friend.nick = document.getElementById("friendNickInput").value;
+						friend.name = document.getElementById("friendNameInput").value;
+						window.electronAPI.updatePrefs(localPrefs);
+						//update friend list
+						div.innerHTML = "";
+						div.innerHTML =
+							friend.nick != "" && friend.nick != undefined
+								? `${friend.nick} (${friend.name})`
+								: friend.name;
+						div.appendChild(manageBtn);
+						div.setAttribute("name", friend.id);
+						div.onclick = selectFriend;
+						div.addEventListener("click", selectFriend, true);
+						//close modal
+						closeModals();
+					};
+				} else {
+					//no friend found??
+					console.error("Friend not found when adding manage friend button");
+				}
+			};
+			div.appendChild(manageBtn);
 		});
 	});
 	friendsListObserver.observe(document.getElementById("friends"), {
@@ -117,10 +167,26 @@ async function webSocketInit() {
 }
 
 function sendFriendReq(userId) {
+	if (localPrefs.friends.filter((f) => f.id == userId).length > 0) {
+		//already friends
+		//show toast/notif
+		return;
+	}
+	if (friendReqs.outgoing.filter((r) => r.to == userId).length > 0) {
+		//already sent req
+		//show toast/notif
+		return;
+	}
+	if (userId == selfId) {
+		//can't send friend request to self
+		//show toast/notif
+		return;
+	}
+	//TODO add validation for uuid
 	console.log("sending fr for ", userId);
 	//update ui for loading
 	socket.emit("friendRequest", userId, (data) => {
-		if ((data.status = "awaiting")) {
+		if (data.status == "awaiting") {
 			console.log(data);
 			//check if we already have this request
 			let existingReq = friendReqs.outgoing.filter((r) => r.to == userId);
@@ -131,13 +197,28 @@ function sendFriendReq(userId) {
 			}
 		}
 	});
+	closeModals();
+	//show toast/notif
+	document.getElementById("friendIdInput").value = "";
 }
 
 function checkFriendReqs() {
 	socket.on("friendRequestResponse", (request) => {
 		if (request.from != selfId) {
-			//got a response from a request we did not send
-			console.log("BAD ->>> got a response from a request we did not send");
+			//got a response from a request we did not send, probably a cancellation
+			if (request.status == "cancelled" && request.to == selfId) {
+				//remove from incoming
+				friendReqs.incoming = friendReqs.incoming.filter(
+					(r) => r.chat != request.chat && r.from != request.from
+				);
+				//update ui
+				let reqDiv = document.querySelector(
+					`.friend-request-item[reqFrom="${request.from}"]`
+				);
+				if (reqDiv) {
+					reqDiv.remove();
+				}
+			}
 		}
 		//add friend
 		if (request.status == "accepted") {
@@ -182,8 +263,8 @@ function checkFriendReqs() {
 	socket.emit("checkFriendReqs", ({ incoming, outgoing }) => {
 		console.log(incoming, outgoing);
 		//store to global friendReqs
-		friendReqs.incoming = Array.isArray(incoming) ? incoming : [];
-		friendReqs.outgoing = Array.isArray(outgoing) ? outgoing : [];
+		friendReqs.incoming = incoming;
+		friendReqs.outgoing = outgoing;
 	});
 }
 
@@ -346,8 +427,8 @@ function selectFriend(e) {
 	el.classList.add("selected");
 	selectedFriend = el.getAttribute("name");
 	let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
-	if (privFriend && privFriend.chatId) {
-		displayChat(privFriend.chatId);
+	if (privFriend && privFriend.chat) {
+		displayChat(privFriend.chat);
 	} else {
 		console.log("Error finding friend chat for ", selectedFriend);
 	}
@@ -374,16 +455,29 @@ function showFriendRequests(e) {
 		reqDiv.className = "friend-request-item";
 		reqDiv.innerHTML = `
 			<span>${req.fromName || req.from}</span>
-			<span class="icon mr-1"><i class="accept-friend-request fas fa-xl fa-check"></i></span>
-			<span class="icon ml-1"><i class="reject-friend-request fas fa-xl fa-x"></i></span>
+			<span>
+			<span class="icon mx-1"><i class="accept-friend-request fas fa-xl fa-check-circle"></i></span>
+			<span class="icon ml-1"><i class="reject-friend-request fas fa-xl fa-circle-xmark"></i></span>
+			</span>
 		`;
+		reqDiv.setAttribute("reqFrom", req.from);
 		reqDiv.querySelector(".accept-friend-request").onclick = () => {
-			socket.emit("friendRequestResponse", (req.status = "accepted"));
+			req.status = "accepted";
+			socket.emit("friendRequestResponse", req);
 			reqDiv.remove();
 			friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
+			//add friend to local prefs
+			localPrefs.friends.push({
+				name: req.from,
+				id: req.from,
+				chat: req.chat,
+			});
+			window.electronAPI.updatePrefs(localPrefs);
+			//display toast/notif
 		};
 		reqDiv.querySelector(".reject-friend-request").onclick = () => {
-			socket.emit("friendRequestResponse", (req.status = "rejected"));
+			req.status = "rejected";
+			socket.emit("friendRequestResponse", req);
 			reqDiv.remove();
 			friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
 		};
@@ -404,10 +498,10 @@ function showFriendRequests(e) {
 		reqDiv.className = "friend-request-item";
 		reqDiv.innerHTML = `
 			<span>${req.toName || req.to}</span>
-			<span class="icon mx-1"><i class="reject-friend-request fas fa-xl fa-x"></i></span>
+			<span class="icon mx-1"><i class="reject-friend-request fas fa-xl fa-circle-xmark"></i></span>
 		`;
 		reqDiv.querySelector(".reject-friend-request").onclick = () => {
-			socket.emit("cancelFriendRequest", { req });
+			socket.emit("cancelFriendRequest", req);
 			reqDiv.remove();
 			friendReqs.outgoing = friendReqs.outgoing.filter((r) => r.to !== req.to);
 		};
@@ -415,7 +509,6 @@ function showFriendRequests(e) {
 	});
 }
 
-// Add showFriends function: restores the friends list view
 function showFriends(e) {
 	removeClassFromAll(".friends-menu-item > i", "active");
 	document.getElementById("friendsViewBtn").classList.add("active");

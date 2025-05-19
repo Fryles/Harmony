@@ -1,44 +1,17 @@
 {
-  "requests": [
-    {
-      "from": "7bd268b1-67c5-4be4-937a-6f0643cbef3a",
-      "to": "fed862d1-1195-4a86-a028-c4e2749b5400",
-      "chat": "a34f2be50737f83bcda8eb87270307c1c21349c4650fa2dd",
-      "time": 1747422788527,
-      "status": "awaiting"
-    },
-    {
-      "from": "78fc19d8-f580-4632-aa1b-149244604644",
-      "to": "da967034-e08a-4d8f-b377-8bf1df9ff1ac",
-      "chat": "d70c7d22ad049077bfaae010c88183c4f69c51d9aa6a6a23",
-      "time": 1747427636984,
-      "status": "awaiting"
-    }
-  ],
+  "requests": [],
   "users": {
-    "fed862d1-1195-4a86-a028-c4e2749b5400": {
-      "name": "Cool Bee",
-      "secret": "962c003c2cefe8faba79d9977a7649dfb8bc42d0e5d698ffd9f14141f5520b67",
-      "session": "95f1b56753dfb32d40126c537ac82a78",
-      "sessionTimestamp": 1747427341337
-    },
-    "7bd268b1-67c5-4be4-937a-6f0643cbef3a": {
-      "name": "Sneaky Kangaroo",
-      "secret": "23440510f1b60929be013a0448404c897c74a49eb6ec0fe2d0f5903df20e93bc",
-      "session": "78b3b972aab844f1f54086bee75b2400",
-      "sessionTimestamp": 1747427347098
-    },
     "da967034-e08a-4d8f-b377-8bf1df9ff1ac": {
       "name": "Lazy Elephant",
       "secret": "a6d219e8684134c1eb1841c39e941725a990e48c1140f397972714abde910725",
-      "session": "a3d55f62a3f4753e6a802200ad05e67a",
-      "sessionTimestamp": 1747429189050
+      "session": "3dcba4f10bc3073ed9841fbc5513ad0f",
+      "sessionTimestamp": 1747675131059
     },
     "78fc19d8-f580-4632-aa1b-149244604644": {
-      "name": "Spooky Tiger",
+      "name": "newuser",
       "secret": "cb60ac5b24e3cdb1004bd2d1119d49bb77484237c7ed780eb43c1cc6fdf9609f",
-      "session": "baded28af20a4d917caf5a253bfc58f3",
-      "sessionTimestamp": 1747429270086
+      "session": "b65531d9c1f7e4958d2c9bbba0eb2b66",
+      "sessionTimestamp": 1747675151275
     }
   },
   "ips": {},

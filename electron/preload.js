@@ -84,7 +84,7 @@ function defaultPrefs() {
 		servers: [
 			{
 				name: "pub",
-				id: 123,
+				id: pub,
 				password: "",
 			},
 		],
@@ -101,7 +101,7 @@ function defaultPrefs() {
 				name: "buh",
 				nick: "",
 				id: "whatmybabysaid",
-				chatId: "BUHCHAT",
+				chat: "BUHCHAT",
 			},
 		],
 		devices: {
@@ -115,7 +115,7 @@ function defaultPrefs() {
 		audio: {
 			inputGain: 1.0,
 			outputVolume: 0.8,
-			hotMicThresh: 0.3,
+			hotMicThresh: 0.1,
 			enableNoiseSuppression: true,
 			ringVolume: 0.5,
 		},
@@ -130,6 +130,9 @@ function loadPrefs(prefs) {
             --bulma-primary-h: ${accent[0]};
 						--bulma-primary-s: ${accent[1]}%;
 						--bulma-primary-l: ${accent[2]}%;
+						--bulma-focus-h: ${accent[0]};
+						--bulma-focus-s: ${accent[1]}%;
+						--bulma-focus-l: ${accent[2]}%;
 	}`;
 	var customStyles = document.createElement("style");
 	customStyles.textContent = styles;

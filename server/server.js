@@ -6,6 +6,7 @@ import cors from "cors";
 import sirv from "sirv";
 import { JSONFilePreset } from "lowdb/node";
 import crypto from "crypto";
+import { json } from "stream/consumers";
 
 // ENVIRONMENT VARIABLES
 const PORT = process.env.PORT || 3000;
@@ -257,11 +258,13 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	//friend requests are tracked with 4 statuses:
+	//friend requests are tracked with 5 statuses:
 	//awaiting - first pushed to server
+	//cancelled - the sender has cancelled the request
 	//accepted - the reciever has accepted the request
 	//rejected - the reciever has denied the request
 	//recieved - the sender has acked the response - req can be deleted
+
 	socket.on("friendRequest", async (friend, callback) => {
 		//validate friend is not imaginary
 		const uuidV4Regex =
@@ -332,8 +335,6 @@ io.on("connection", (socket) => {
 	});
 
 	socket.on("friendRequestResponse", async (req) => {
-		console.log(req);
-
 		const userId = socket.handshake.auth.userId;
 		const requests = db.data.requests;
 		const idx = requests.findIndex(
@@ -344,6 +345,10 @@ io.on("connection", (socket) => {
 				requests[idx].status = "accepted";
 			} else if (req.status === "rejected") {
 				requests[idx].status = "rejected";
+			} else {
+				//invalid status for response
+				console.log("Invalid status for friend request response");
+				return;
 			}
 			//see if the sender is online
 			const sender = connections[req.from];
@@ -351,13 +356,14 @@ io.on("connection", (socket) => {
 				//send the sender the response
 				io.to(sender.socketId).emit("friendRequestResponse", req);
 				requests[idx].status = "recieved";
+				//remove request
+				requests.splice(idx, 1);
 				await db.write();
 			} else {
 				//sender is offline, just update the request
 				await db.write();
 			}
 		} else {
-			console.log("Request not found");
 		}
 	});
 
@@ -388,11 +394,21 @@ io.on("connection", (socket) => {
 		const userId = socket.handshake.auth.userId;
 		const requests = db.data.requests;
 		const idx = requests.findIndex(
-			(r) => r.from === userId && r.to === req.to && r.status === "awaiting"
+			(r) =>
+				r.from === userId &&
+				r.to === req.to &&
+				r.chat === req.chat &&
+				r.status === "awaiting"
 		);
 		if (idx !== -1) {
 			requests.splice(idx, 1);
 			await db.write();
+			// Emit friendRequestCancelled to the target peer if possible
+			const toPeer = connections[req.to];
+			if (toPeer) {
+				req.status = "cancelled";
+				io.to(toPeer.socketId).emit("friendRequestResponse", req);
+			}
 		} else {
 			console.log("Request not found or already accepted/rejected");
 		}

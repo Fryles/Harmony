@@ -797,7 +797,7 @@ class rtcInterface {
 			updateGainBasedOnAmplitude();
 		} catch (err) {
 			console.error("Could not get local audio:", err);
-			alert("could not find audio device specified in settings");
+			//alert("could not find audio device specified in settings");
 		}
 	}
 }

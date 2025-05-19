@@ -218,8 +218,8 @@ html {
 	z-index: 5;
 }
 .selected {
-	background-color: var(--bulma-primary-soft) !important;
-	color: var(--bulma-primary-soft-invert);
+	background-color: var(--bulma-grey) !important;
+	color: var(--bulma-primary-light);
 }
 .slider {
 	width: 80%;
@@ -249,7 +249,25 @@ html {
 	padding: 0.6em 1em;
 	border-bottom: var(--bulma-black-ter) 2px solid;
 	transition: all 0.3s ease;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	flex-direction: row;
 }
+
+.friend-item.selected > span {
+	color: var(--bulma-primary-light);
+}
+.friend-item > span:hover {
+	transform: scale(1.1);
+	color: #fff;
+}
+
+.friend-item > span {
+	transition: all 0.3s ease;
+	color: var(--bulma-grey-light);
+}
+
 .friend-item:nth-child(odd) {
 	background-color: var(--bulma-grey-dark);
 }
@@ -257,7 +275,6 @@ html {
 	cursor: pointer;
 	box-shadow: 0 0px 5px 3px rgba(0, 0, 0, 0.2);
 	color: #fff;
-	font-weight: bold;
 }
 #friends-header {
 	box-shadow: 0 0px 5px 3px rgba(0, 0, 0, 0.2);
@@ -324,6 +341,7 @@ html {
 	display: flex;
 	flex-direction: row;
 	align-items: center;
+	justify-content: space-between;
 }
 .friend-request-item:nth-child(odd) {
 	background-color: var(--bulma-grey-dark);
@@ -355,4 +373,20 @@ html {
 }
 .reject-friend-request:active {
 	color: var(--bulma-danger-dark);
+}
+div.modal-background {
+	background-color: rgba(0, 0, 0, 0.3);
+	backdrop-filter: blur(8px);
+}
+#friendreq-modal-card {
+	width: 90%;
+	max-width: 400px;
+}
+#friendreq-modal-card > section,
+#friendreq-modal-card > header,
+#friendreq-modal-card > footer {
+	padding: 1em;
+}
+.modal-card-head {
+	box-shadow: none;
 }
