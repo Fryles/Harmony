@@ -239,12 +239,12 @@ function checkFriendReqs() {
 		//add friend
 		if (request.status == "accepted") {
 			localPrefs.friends.push({
-				name: request.to,
+				name: request.toName,
 				id: request.to,
 				chat: request.chat,
 			});
 			window.electronAPI.updatePrefs(localPrefs);
-			//display toast/notif
+			showToast(`${DOMPurify(request.toName)} Is Now Your Friend!`);
 		} else {
 			//rejected :(
 		}
@@ -271,8 +271,9 @@ function checkFriendReqs() {
 				friendReqs.incoming.push(request);
 			} else {
 				console.warn("Already have this request");
+				return;
 			}
-			//display toast/notif
+			showToast(`${DOMPurify(request.fromName)} Sent You a Friend Request`);
 		}
 	});
 
@@ -305,6 +306,8 @@ function rcvChat(msg) {
 	channel = msg.channel;
 	if (channel == currentChat) {
 		updateChat(msg);
+	} else {
+		//TODO add notif for chat we are not viewing
 	}
 	storeChat(msg, channel);
 }
@@ -654,10 +657,130 @@ async function storePrefs() {
 	window.electronAPI.updatePrefs(localPrefs);
 }
 
+function manageVoiceUser(e) {
+	//make sure were not clicking ourselves
+	if (e.target.id == selfId) {
+		return;
+	}
+	console.log("gerr");
+
+	//event handler for voice user onclick
+	const userDiv = e.target.closest(".voice-prof");
+	if (!userDiv) return;
+
+	// Remove any existing popup
+	const existingPopup = document.getElementById("voice-user-popup");
+	if (existingPopup) existingPopup.remove();
+
+	const userId = userDiv.id;
+	let friend = userLookup(userId);
+	let username = DOMPurify.sanitize(
+		friend.nick != "" && friend.nick != undefined
+			? `${friend.nick} (${friend.name})`
+			: friend.name
+	);
+
+	// Create popup
+	const popup = document.createElement("div");
+	popup.id = "voice-user-popup";
+	popup.style.position = "absolute";
+	popup.style.zIndex = 10000;
+	popup.style.background = "#23272a";
+	popup.style.border = "1px solid #444";
+	popup.style.borderRadius = "10px";
+	popup.style.padding = "1rem";
+	popup.style.boxShadow = "0 2px 10px rgba(0,0,0,0.4)";
+	popup.style.width = "250px";
+	popup.style.color = "#fff";
+	popup.innerHTML = `
+		<div style="margin-bottom: 0.5rem; font-weight: bold;">${DOMPurify.sanitize(
+			username
+		)}</div>
+		<div style="margin-bottom: 0.5rem;">
+			<label style="font-size: 0.9em;">Voice Volume</label>
+			<input type="range" min="0" max="2" step="0.01" value="1" style="width: 100%;" id="voice-volume-slider">
+		</div>
+		<button class="button is-small is-link" id="addFriendVoiceBtn" style="width:100%;margin-bottom:0.3rem;">
+			<i class="fas fa-user-plus"></i> Add Friend
+		</button>
+	`;
+
+	// Position popup to the left of the userDiv
+	const rect = userDiv.getBoundingClientRect();
+	popup.style.top = `${rect.top + window.scrollY - 50}px`;
+	popup.style.left = `${rect.left + window.scrollX - 260}px`;
+
+	document.body.appendChild(popup);
+
+	// Voice volume slider
+	const slider = popup.querySelector("#voice-volume-slider");
+	let initialVol = 1;
+	let friendObj = localPrefs.friends.find((f) => f.id == userId);
+	if (friendObj && typeof friendObj.volume === "number") {
+		initialVol = friendObj.volume;
+	} else {
+		let voiceUserVolumes = {};
+		try {
+			voiceUserVolumes =
+				JSON.parse(localStorage.getItem("voiceUserVolumes")) || {};
+		} catch (e) {
+			voiceUserVolumes = {};
+		}
+		if (typeof voiceUserVolumes[userId] === "number") {
+			initialVol = voiceUserVolumes[userId];
+		}
+	}
+	slider.value = initialVol;
+	slider.oninput = (ev) => {
+		const vol = parseFloat(ev.target.value);
+		rtc.setUserVolume(userId, vol);
+	};
+
+	// Add friend logic
+	const addBtn = popup.querySelector("#addFriendVoiceBtn");
+	addBtn.onclick = () => {
+		sendFriendReq(userId);
+		popup.remove();
+	};
+
+	// Close popup on outside click
+	const closePopup = (evt) => {
+		if (!popup.contains(evt.target)) {
+			popup.remove();
+			document.removeEventListener("mousedown", closePopup, true);
+			//save volume to prefs
+			const vol = parseFloat(slider.value);
+			let friend = localPrefs.friends.find((f) => f.id == userId);
+			if (friend && friend.volume != vol) {
+				friend.volume = vol;
+				//avoid writing to json if no change
+				window.electronAPI.updatePrefs(localPrefs);
+			} else {
+				// Store in voiceUserVolumes in localStorage
+				let voiceUserVolumes = {};
+				try {
+					voiceUserVolumes =
+						JSON.parse(localStorage.getItem("voiceUserVolumes")) || {};
+				} catch (e) {
+					voiceUserVolumes = {};
+				}
+				voiceUserVolumes[userId] = vol;
+				localStorage.setItem(
+					"voiceUserVolumes",
+					JSON.stringify(voiceUserVolumes)
+				);
+			}
+		}
+	};
+	setTimeout(() => {
+		document.addEventListener("mousedown", closePopup, true);
+	}, 10);
+}
+
 function validateField(element) {
 	element.classList.add("is-danger");
 	element.focus();
-	setTimeout(element.classList.remove("is-danger"), 6000);
+	setTimeout(element.classList.remove("is-danger"), 5000);
 }
 
 //hash password to hex str

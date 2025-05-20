@@ -110,6 +110,8 @@ function defaultPrefs() {
 				nick: "",
 				id: "whatmybabysaid",
 				chat: "BUHCHAT",
+				color: "#056bf9",
+				volume: 1.0,
 			},
 		],
 		devices: {

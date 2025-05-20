@@ -4,14 +4,14 @@
     "da967034-e08a-4d8f-b377-8bf1df9ff1ac": {
       "name": "Lazy Elephant",
       "secret": "a6d219e8684134c1eb1841c39e941725a990e48c1140f397972714abde910725",
-      "session": "c89096d8b7a906bd9ef923fee9747bf6",
-      "sessionTimestamp": 1747688507160
+      "session": "4f91c0e2883a9fc978a97fee3aae2aad",
+      "sessionTimestamp": 1747766829786
     },
     "78fc19d8-f580-4632-aa1b-149244604644": {
       "name": "newuser",
       "secret": "cb60ac5b24e3cdb1004bd2d1119d49bb77484237c7ed780eb43c1cc6fdf9609f",
-      "session": "f027e85dea917b076c692ea521e3abe7",
-      "sessionTimestamp": 1747688488856
+      "session": "b1d38d90eea1e2d2967e36804c959f37",
+      "sessionTimestamp": 1747766740233
     }
   },
   "ips": {},

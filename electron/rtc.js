@@ -5,6 +5,7 @@ class rtcInterface {
 		this.mediaChannel = null; //channel for video/voice
 		this.peerConnections = {};
 		this.remoteAudioStreams = {};
+		this.remoteAudioGainNodes = {};
 		this.dataChannels = {};
 		this.rtcConfig = {
 			iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -492,9 +493,9 @@ class rtcInterface {
 		}
 
 		pc.ontrack = (event) => {
-			console.log("recieved remote track");
+			console.log("recieved remote track", event);
 			this.remoteAudioStreams[peerId] = event.streams[0];
-			this._playRemoteAudio(peerId, event.streams[0]);
+			this._playRemoteAudio(peerId, event);
 		};
 
 		pc.onnegotiationneeded = async () => {
@@ -676,9 +677,9 @@ class rtcInterface {
 		};
 
 		pc.ontrack = (event) => {
-			console.log("recieved remote track");
+			console.log("recieved remote track", event);
 			this.remoteAudioStreams[peerId] = event.streams[0];
-			this._playRemoteAudio(peerId, event.streams[0]);
+			this._playRemoteAudio(peerId, event);
 		};
 
 		pc.onicecandidate = (event) => {
@@ -715,7 +716,7 @@ class rtcInterface {
 		}
 	}
 
-	_playRemoteAudio(peerId, stream) {
+	_playRemoteAudio(peerId, trackEvent) {
 		// Create or reuse an <audio> element for this peer
 		let audioElem = document.getElementById(`remote-audio-${peerId}`);
 		if (!audioElem) {
@@ -725,9 +726,51 @@ class rtcInterface {
 			audioElem.style.display = "none";
 			document.body.appendChild(audioElem);
 		}
-		// attachAudioVisualizer(stream);
-		visualizeBorderWithAudio(stream, peerId);
-		audioElem.srcObject = stream;
+		let stream = trackEvent.streams[0];
+		// --- Add controllable GainNode for remote audio ---
+		if (!this._audioContext) {
+			this._audioContext = new (window.AudioContext ||
+				window.webkitAudioContext)();
+		}
+		// Disconnect previous gain node if exists
+		if (this.remoteAudioGainNodes[peerId]) {
+			this.remoteAudioGainNodes[peerId].disconnect();
+		}
+
+		const remoteSource = this._audioContext.createMediaStreamSource(stream);
+		const remoteGainNode = this._audioContext.createGain();
+		// Set gain to friend volume or 1
+		const friendPref = localPrefs.friends.filter((f) => f.id == peerId)[0];
+		remoteGainNode.gain.value =
+			friendPref && typeof friendPref.volume === "number"
+				? friendPref.volume
+				: 1;
+
+		const remoteDestination = this._audioContext.createMediaStreamDestination();
+		remoteSource.connect(remoteGainNode);
+		remoteGainNode.connect(remoteDestination);
+
+		// Save gain node for later control
+		this.remoteAudioGainNodes[peerId] = remoteGainNode;
+
+		//CHROME BUG THAT TOOK ME 5 HOURS TO FIND
+		let dummy = new Audio();
+		dummy.srcObject = stream;
+		dummy.muted = true;
+		//YAY I <3 CHROMIUM
+
+		audioElem.srcObject = remoteDestination.stream;
+
+		// attachAudioVisualizer(remoteDestination.stream);
+		visualizeBorderWithAudio(remoteDestination.stream, peerId);
+	}
+
+	setUserVolume(userID, volume) {
+		// Clamp volume between 0.0 and 1
+		const vol = Math.max(0, Math.min(2, volume));
+		if (this.remoteAudioGainNodes && this.remoteAudioGainNodes[userID]) {
+			this.remoteAudioGainNodes[userID].gain.value = vol;
+		}
 	}
 
 	async _initLocalAudio() {
@@ -834,13 +877,18 @@ function addVoiceUser(userId) {
 	}
 	voiceUser.innerHTML = DOMPurify.sanitize(name);
 	voiceUser.id = userId;
-	voiceUser.onclick = function (e) {
-		//TODO
-	};
+	voiceUser.addEventListener("click", (e) => {
+		manageVoiceUser(e);
+	});
+	let friendPref = localPrefs.friends.filter((f) => f.id == userId)[0];
+	if (friendPref) {
+		voiceUser.style = `background-color: ${friendPref.color};`;
+	}
 	document.getElementById("voice-list").appendChild(voiceUser);
 	//add talking animation
 	if (userId == selfId) visualizeBorderWithAudio(rtc.localAudioStream, userId);
 }
+
 function removeVoiceUser(userId) {
 	const voiceUser = document.getElementById(userId);
 	if (voiceUser && voiceUser.parentNode) {

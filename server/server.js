@@ -259,7 +259,7 @@ io.on("connection", (socket) => {
 
 	//friend requests are tracked with 5 statuses:
 	//awaiting - first pushed to server
-	//cancelled - the sender has cancelled the request
+	//cancelled - the sender has cancelled the request, req can be deleted
 	//accepted - the reciever has accepted the request
 	//rejected - the reciever has denied the request
 	//recieved - the sender has acked the response - req can be deleted
