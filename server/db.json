@@ -1,19 +1,32 @@
 {
   "requests": [],
   "users": {
-    "da967034-e08a-4d8f-b377-8bf1df9ff1ac": {
-      "name": "Lazy Elephant",
-      "secret": "a6d219e8684134c1eb1841c39e941725a990e48c1140f397972714abde910725",
-      "session": "4f91c0e2883a9fc978a97fee3aae2aad",
-      "sessionTimestamp": 1747766829786
+    "f842a398-9470-4644-8165-64aad570267f": {
+      "name": "Fluffy Ghost",
+      "secret": "b2fe6cd46334bdada6e231e3db867463bd8e79f5ffb9b3f0fb0a0961f4d2ad57",
+      "session": "2b359e22eafc3e22969fdaf9b6ae0512",
+      "sessionTimestamp": 1747860792936
     },
-    "78fc19d8-f580-4632-aa1b-149244604644": {
-      "name": "newuser",
-      "secret": "cb60ac5b24e3cdb1004bd2d1119d49bb77484237c7ed780eb43c1cc6fdf9609f",
-      "session": "b1d38d90eea1e2d2967e36804c959f37",
-      "sessionTimestamp": 1747766740233
+    "a268f8bb-a15a-48cc-90fd-f92642f41b95": {
+      "name": "Quantum Owl",
+      "secret": "f29fb849c7071e8a8b20b6f14ea72822fb96541bc755fbb8d285156c51fc6f2a",
+      "session": "31bde9a01efd8edf47b858e96643cfcb",
+      "sessionTimestamp": 1747859759050
     }
   },
   "ips": {},
-  "servers": {}
+  "servers": {
+    "asd": {
+      "name": "asd",
+      "id": "3a517a7a-3eaa-42a3-816e-897896688e1e",
+      "secret": "203c790f8bd5be13358d46f597d369ab1bf967f05590e88d0b51def33b7154b6",
+      "options": {
+        "serverOpen": true,
+        "serverUnlisted": false,
+        "serverStoredMessaging": true
+      },
+      "admin": "f842a398-9470-4644-8165-64aad570267f",
+      "messages": []
+    }
+  }
 }

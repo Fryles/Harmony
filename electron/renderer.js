@@ -10,12 +10,24 @@ const dev = 1;
 // Global for stacking toasts
 let toastStackHeight = 0;
 
+// Add a global to track last xhr poll error toast time
+let lastLoopingToast = 0;
+
 main();
 
 async function main() {
+	//set save listener incase first load
+	document.getElementById("settings-save").addEventListener("click", () => {
+		storePrefs();
+		closeModals();
+	});
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
 
+	if (!localPrefs) {
+		//We rly cant do much without local prefs, just wait until user saves for first time then reload
+		return;
+	}
 	selfId = localPrefs.user.userId;
 
 	await webSocketInit();
@@ -24,16 +36,13 @@ async function main() {
 	if (!localPrefs.user.password) {
 		//get user to set password
 	}
-	//init chat and voice interfaces
 
-	// VoiceInterface = new rtcVoice();
-
-	//TODO start rtc chat with all possible peers
-
-	// attach listeners
-	document
-		.getElementById("settings-save")
-		.addEventListener("click", storePrefs);
+	document.getElementById("add-server").addEventListener("click", () => {
+		registerServer();
+	});
+	document.getElementById("join-server").addEventListener("click", () => {
+		addServer();
+	});
 	document.getElementById("add-friend").addEventListener("click", () => {
 		sendFriendReq(document.getElementById("friendIdInput").value);
 	});
@@ -72,9 +81,9 @@ async function main() {
 	});
 
 	const friendsListObserver = new MutationObserver(() => {
-		if (localPrefs.friends) {
+		if (localPrefs.friends.length > 0) {
 			let firstFriend = document.getElementsByName(localPrefs.friends[0].id)[0];
-			if (firstFriend) {
+			if (firstFriend && !selectedFriend) {
 				selectFriend(firstFriend);
 			}
 		}
@@ -102,6 +111,9 @@ async function main() {
 						localPrefs.friends = localPrefs.friends.filter(
 							(f) => f.id != friendId
 						);
+						if (selectedFriend == friendId) {
+							selectedFriend = null;
+						}
 						window.electronAPI.updatePrefs(localPrefs);
 						//remove from ui
 						div.remove();
@@ -150,6 +162,26 @@ async function main() {
 		pwdInput.value = e.target.checked ? "" : pwdInput.value;
 		pwdInput.disabled = e.target.checked;
 	});
+
+	// Join all server and friend chats on startup
+	if (localPrefs && rtc) {
+		// Join all server chats
+		if (Array.isArray(localPrefs.servers)) {
+			localPrefs.servers.forEach((server) => {
+				if (server.secret) {
+					rtc.joinChannel(server.secret);
+				}
+			});
+		}
+		// Join all friend chats
+		if (Array.isArray(localPrefs.friends)) {
+			localPrefs.friends.forEach((friend) => {
+				if (friend.chat) {
+					rtc.joinChannel(friend.chat);
+				}
+			});
+		}
+	}
 }
 
 async function webSocketInit() {
@@ -173,7 +205,150 @@ async function webSocketInit() {
 			auth: auth,
 		});
 	}
+	this.socket.on("connect_error", (err) => {
+		if (err.message == "xhr poll error") {
+			const now = Date.now();
+			if (now - lastLoopingToast > 7000) {
+				showToast("Disconnected from server");
+				lastLoopingToast = now;
+			}
+			return;
+		}
+		showToast(err.message);
+	});
 	this.socket.emit("ready");
+}
+
+function isPasswordComplex(pwd) {
+	// At least 8 chars
+	return typeof pwd === "string" && pwd.length >= 8;
+}
+
+async function registerServer() {
+	let name = document.getElementById("serverNameInput").value;
+	let pwd = document.getElementById("serverPasswordInput").value;
+	let id = crypto.randomUUID();
+
+	const secret = await hashbrown(`server:${id}:${pwd}`);
+	console.log(secret);
+
+	let options = {
+		serverOpen: document.getElementById("serverOpen").checked,
+		serverUnlisted: document.getElementById("serverUnlisted").checked,
+		serverStoredMessaging: document.getElementById("serverStoredMessaging")
+			.checked,
+	};
+	if ((pwd === "" || !pwd) && !options.serverOpen) {
+		//empty pwd with non-open server
+		showToast("A Closed Server Must Have a Password");
+		return;
+	}
+	// Password complexity check for closed servers
+	if (!options.serverOpen && !isPasswordComplex(pwd)) {
+		showToast("Password must be at least 8 characters.");
+		return;
+	}
+
+	if (name.length > 32 || name.length < 3) {
+		showToast("Server name is too long or too short.");
+		return;
+	}
+
+	let sovo = {
+		name: name,
+		id: id,
+		secret: secret,
+		options: options,
+	};
+	socket.emit("registerServer", sovo, (res) => {
+		if (res.success) {
+			console.log(res);
+
+			showToast(`Created Server: ${res.server.name}`);
+			// Add server to prefs and update
+			if (!localPrefs.servers) localPrefs.servers = [];
+			localPrefs.servers.push(res.server);
+			// Add server to UI before the "Add Server" button
+			const serverList = document.getElementById("server-list");
+			if (serverList) {
+				const addServerBtn = serverList.querySelector(
+					'.server-item[name="HARMONY-ADD-SERVER"]'
+				);
+				const serverDiv = document.createElement("div");
+				serverDiv.className = "server-item";
+				serverDiv.setAttribute("name", res.server.id);
+				let name = res.server.name;
+				if (name.includes(" ") && name.length > 5) {
+					//split two part name into two 2 char initials
+					name = name.split(" ");
+					name = name[0].substring(0, 2) + " " + name[1].substring(0, 2);
+				} else if (name.length > 5) {
+					name = name.substring(0, 5);
+				}
+				serverDiv.textContent = DOMPurify.sanitize(name);
+				serverDiv.addEventListener("click", selectServerItem, true);
+				if (addServerBtn) {
+					serverList.insertBefore(serverDiv, addServerBtn);
+				} else {
+					serverList.appendChild(serverDiv);
+				}
+			}
+			closeModals();
+			window.electronAPI.updatePrefs(localPrefs);
+		} else {
+			if (res.error) {
+				showToast(res.error);
+			}
+		}
+	});
+}
+
+function addServer() {
+	const name = document.getElementById("joinServerNameInput").value;
+	const pwd = document.getElementById("joinServerPasswordInput").value;
+
+	//query server exact to get id (could be real or fake)
+	socket.emit("serverQuery", name, true, async (res) => {
+		res = res[0];
+		const secret = await hashbrown(`server:${res.id}:${pwd}`);
+		socket.emit("serverAuth", name, res.id, secret, (res) => {
+			if (res) {
+				// Add server to prefs and update
+				if (!localPrefs.servers) localPrefs.servers = [];
+				localPrefs.servers.push(res);
+				// Add server to UI before the "Add Server" button
+				const serverList = document.getElementById("server-list");
+				if (serverList) {
+					const addServerBtn = serverList.querySelector(
+						'.server-item[name="HARMONY-ADD-SERVER"]'
+					);
+					const serverDiv = document.createElement("div");
+					serverDiv.className = "server-item";
+					serverDiv.setAttribute("name", res.id);
+					let name = res.name;
+					if (name.includes(" ") && name.length > 5) {
+						//split two part name into two 2 char initials
+						name = name.split(" ");
+						name = name[0].substring(0, 2) + " " + name[1].substring(0, 2);
+					} else if (name.length > 5) {
+						name = name.substring(0, 5);
+					}
+					serverDiv.textContent = DOMPurify.sanitize(name);
+					serverDiv.addEventListener("click", selectServerItem, true);
+					if (addServerBtn) {
+						serverList.insertBefore(serverDiv, addServerBtn);
+					} else {
+						serverList.appendChild(serverDiv);
+					}
+				}
+				showToast(`Joined ${DOMPurify.sanitize(res.name)}`);
+				closeModals();
+				window.electronAPI.updatePrefs(localPrefs);
+			} else {
+				showToast(`Failed to join ${name}`);
+			}
+		});
+	});
 }
 
 function sendFriendReq(userId) {
@@ -235,8 +410,9 @@ function checkFriendReqs() {
 					reqDiv.remove();
 				}
 			}
+			return;
 		}
-		//add friend
+		//else outgoing req
 		if (request.status == "accepted") {
 			localPrefs.friends.push({
 				name: request.toName,
@@ -246,9 +422,14 @@ function checkFriendReqs() {
 			window.electronAPI.updatePrefs(localPrefs);
 			showToast(`${DOMPurify(request.toName)} Is Now Your Friend!`);
 		} else {
-			//rejected :(
 		}
 		//update friend requests
+		let reqDiv = document.querySelector(
+			`.friend-request-item[reqTo="${request.to}"]`
+		);
+		if (reqDiv) {
+			reqDiv.remove();
+		}
 		//remove our acked friend request from friendReqs.outgoing
 		if (friendReqs.outgoing) {
 			friendReqs.outgoing = friendReqs.outgoing.filter(
@@ -273,7 +454,9 @@ function checkFriendReqs() {
 				console.warn("Already have this request");
 				return;
 			}
-			showToast(`${DOMPurify(request.fromName)} Sent You a Friend Request`);
+			showToast(
+				`${DOMPurify.sanitize(request.fromName)} Sent You a Friend Request`
+			);
 		}
 	});
 
@@ -296,10 +479,12 @@ function sendChat(content) {
 		username: localPrefs.user.username,
 		content: sanitizedContent,
 		channel: currentChat,
+		color: localPrefs.settings.accentColor,
 	};
 	updateChat(msg);
 	storeChat(msg, currentChat);
 	rtc.sendMessage(msg, currentChat);
+	//TODO if on a server with serverStoredMessaging, send to server as well
 }
 
 function rcvChat(msg) {
@@ -307,12 +492,64 @@ function rcvChat(msg) {
 	if (channel == currentChat) {
 		updateChat(msg);
 	} else {
-		//TODO add notif for chat we are not viewing
+		const server = localPrefs.servers.find(
+			(s) => s.secret === channel.split(":")[1]
+		);
+		const user = userLookup(msg.user);
+		if (server) {
+			showToast(
+				`${user.nick ? user.nick : user.name} sent you a message on ${
+					server.name
+				}`,
+				() => {
+					const sovoBtn = document.querySelector(
+						`.server-item[name="${server.id}"]`
+					);
+					if (sovoBtn) {
+						sovoBtn.dispatchEvent(new Event("click", { bubbles: true }));
+					}
+				},
+				msg.color ? msg.color : "is-primary"
+			);
+		} else {
+			showToast(
+				`${user.nick ? user.nick : user.name} sent you a message`,
+				() => {
+					if (selectedServer != "HARMONY-FRIENDS-LIST") {
+						//select friends server, then friend itself
+						const friendsListBtn = document.querySelector(
+							'.server-item[name="HARMONY-FRIENDS-LIST"]'
+						);
+						if (friendsListBtn) {
+							friendsListBtn.dispatchEvent(
+								new Event("click", { bubbles: true })
+							);
+						}
+						// Find the friend and select them
+						const friend = localPrefs.friends.find((f) => f.id === msg.user);
+						if (friend) {
+							const friendDiv = document.getElementsByName(friend.id)[0];
+							if (friendDiv) {
+								friendDiv.dispatchEvent(new Event("click", { bubbles: true }));
+							}
+						}
+					}
+				},
+				msg.color ? msg.color : "is-primary"
+			);
+		}
 	}
 	storeChat(msg, channel);
 }
 
 function displayChat(chatId) {
+	if (!chatId) {
+		document.getElementById("chat-messages").innerHTML = "";
+		return;
+	}
+	if (currentChat == chatId) {
+		return;
+	}
 	//get messages from browser
 	currentChat = `chat:${chatId}`;
 	var messages = [];
@@ -325,7 +562,7 @@ function displayChat(chatId) {
 		console.error("Failed to parse chat history:", e);
 		messages = [];
 	}
-	//clear chat and set all messages
+	//clear chat and set all messages (horrible TODO)
 	document.getElementById("chat-messages").innerHTML = "";
 	messages.forEach((msg) => {
 		updateChat(msg);
@@ -350,6 +587,8 @@ function updateChat(msg) {
 	if (msg.user == selfId) {
 		un.classList.add("is-primary");
 		el.style = "text-align: end;";
+	} else if (msg.color) {
+		el.style = `background-color: ${msg.color}`;
 	}
 
 	let username = msg.username;
@@ -410,6 +649,10 @@ function storeChat(msg, chatId) {
 }
 
 async function changePass(newPass) {
+	if (!isPasswordComplex(newPass)) {
+		showToast("Password must be at least 8 characters.");
+		return;
+	}
 	let newSecret = await hashbrown(`${selfId}:${newPass}`);
 	rtc.socket.emit("changePass", newSecret, (e) => {
 		if (e.success) {
@@ -488,18 +731,19 @@ function showFriendRequests(e) {
 			friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
 			//add friend to local prefs
 			localPrefs.friends.push({
-				name: req.from,
+				name: req.fromName,
 				id: req.from,
 				chat: req.chat,
 			});
 			window.electronAPI.updatePrefs(localPrefs);
-			//display toast/notif
+			showToast(`${DOMPurify(request.fromName)} Is Now Your Friend!`);
 		};
 		reqDiv.querySelector(".reject-friend-request").onclick = () => {
 			req.status = "rejected";
 			socket.emit("friendRequestResponse", req);
 			reqDiv.remove();
 			friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
+			showToast(`Removed Friend Request`);
 		};
 		friendsContainer.appendChild(reqDiv);
 	});
@@ -520,10 +764,12 @@ function showFriendRequests(e) {
 			<span>${DOMPurify.sanitize(req.toName || req.to)}</span>
 			<span class="icon mx-1"><i class="reject-friend-request fas fa-xl fa-circle-xmark"></i></span>
 		`;
+		reqDiv.setAttribute("reqTo", DOMPurify.sanitize(req.to));
 		reqDiv.querySelector(".reject-friend-request").onclick = () => {
 			socket.emit("cancelFriendRequest", req);
 			reqDiv.remove();
 			friendReqs.outgoing = friendReqs.outgoing.filter((r) => r.to !== req.to);
+			showToast(`Cancelled Friend Request`);
 		};
 		friendsContainer.appendChild(reqDiv);
 	});
@@ -575,9 +821,11 @@ async function selectServerItem(e) {
 		chatEl.classList.remove("expand");
 
 		let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
-		if (privFriend && privFriend.chatId) {
-			displayChat(privFriend.chatId);
+		if (privFriend && privFriend.chat) {
+			displayChat(privFriend.chat);
 		} else {
+			//no friend chat to display, show empty chat
+			displayChat(null);
 			console.log("Error finding friend chat for ", selectedFriend);
 		}
 	} else {
@@ -587,11 +835,11 @@ async function selectServerItem(e) {
 		let privServer = localPrefs.servers.find((f) => f.id == selectedServer);
 		if (
 			privServer &&
-			privServer.password !== null &&
-			privServer.password !== undefined
+			privServer.secret !== null &&
+			privServer.secret !== undefined
 		) {
-			let hash = await hashbrown(`${privServer}:${privServer.password}`);
-			displayChat(hash);
+			let chat = privServer.secret;
+			displayChat(chat);
 		} else {
 			console.log("Error finding Server password for ", selectedServer);
 		}
@@ -637,6 +885,14 @@ async function storePrefs() {
 		validateField(passwordEl);
 		return;
 	}
+	// Password complexity check for user password
+	if (
+		passwordEl.value !== localPrefs.user.password &&
+		!isPasswordComplex(passwordEl.value)
+	) {
+		showToast("Password must be at least 8 characters.");
+		return;
+	}
 	if (passwordEl.value !== localPrefs.user.password)
 		changePass(passwordEl.value);
 
@@ -653,16 +909,18 @@ async function storePrefs() {
 		localPrefs.audio[id] = parseFloat(getVal(id));
 	});
 	localPrefs.audio.enableNoiseSuppression = getChk("enableNoiseSuppression");
+	console.log("stored prefs");
 
 	window.electronAPI.updatePrefs(localPrefs);
+	window.electronAPI.loadPrefs(localPrefs);
 }
 
 function manageVoiceUser(e) {
 	//make sure were not clicking ourselves
 	if (e.target.id == selfId) {
+		showToast("Thats You!");
 		return;
 	}
-	console.log("gerr");
 
 	//event handler for voice user onclick
 	const userDiv = e.target.closest(".voice-prof");
@@ -695,7 +953,7 @@ function manageVoiceUser(e) {
 	popup.innerHTML = `
 		<div style="margin-bottom: 0.5rem; font-weight: bold;">${DOMPurify.sanitize(
 			username
-		)}</div>
+		)}<br><span class="is-clickable" style="font-weight: normal;font-size:0.9em;color: var(--bulma-grey-light)" onclick="navigator.clipboard.writeText(this.innerText);showToast('Copied User ID');">${userId}</span></div>
 		<div style="margin-bottom: 0.5rem;">
 			<label style="font-size: 0.9em;">Voice Volume</label>
 			<input type="range" min="0" max="2" step="0.01" value="1" style="width: 100%;" id="voice-volume-slider">
@@ -863,9 +1121,39 @@ function getSelectedDevice(selectId, devices) {
 	return devices.find((d) => d.deviceId === deviceId) || null;
 }
 
+// Utility: Given a hex color string (e.g. "#123123"), return "#000000" or "#ffffff" for best contrast
+function getBestTextColor(hexColor) {
+	// Remove hash if present
+	const hex = hexColor.replace(/^#/, "");
+	// Parse r,g,b
+	let r, g, b;
+	if (hex.length === 3) {
+		r = parseInt(hex[0] + hex[0], 16);
+		g = parseInt(hex[1] + hex[1], 16);
+		b = parseInt(hex[2] + hex[2], 16);
+	} else if (hex.length === 6) {
+		r = parseInt(hex.substring(0, 2), 16);
+		g = parseInt(hex.substring(2, 4), 16);
+		b = parseInt(hex.substring(4, 6), 16);
+	} else {
+		// Invalid hex, default to black
+		return "#000000";
+	}
+	// Calculate luminance
+	const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+	return luminance > 0.5 ? "#000000" : "#ffffff";
+}
+
 function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 	const toast = document.createElement("div");
-	toast.className = `notification ${color}`;
+	// If color is a hex code, set background color directly, else add as class
+	if (/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color)) {
+		toast.className = "notification";
+		toast.style.backgroundColor = color;
+		toast.style.color = getBestTextColor(color);
+	} else {
+		toast.className = `notification ${color}`;
+	}
 	const baseTop = 0.5; // rem
 	const stackOffset = toastStackHeight * 3; // 4rem per toast
 	toast.style.position = "absolute";
@@ -876,6 +1164,7 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 		"transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s";
 	toast.style.zIndex = 9999;
 	toast.style.minWidth = "20px";
+
 	toast.innerHTML = `
 		${DOMPurify.sanitize(
 			msg

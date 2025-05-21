@@ -398,7 +398,27 @@ div.modal-background {
 }
 .modal-card-head {
 	box-shadow: none;
+	padding: 0.5em 2em;
 }
+.modal-card-body {
+	padding: 1.2em 2em;
+}
+.modal-card-foot {
+	padding: 1rem;
+}
+#add-server-modal > .modal-card > .modal-card-body {
+	border-radius: 10px 10px 0 0;
+}
+
+.tabs.is-boxed a {
+	background-color: #0000003a;
+	border-start-end-radius: 10px;
+	border-start-start-radius: 10px;
+}
+.tabs.is-boxed a:hover {
+	background-color: #111111aa;
+}
+
 .notification {
 	padding: 0.5em;
 	position: fixed;
@@ -414,4 +434,7 @@ div.modal-background {
 }
 .toastClose:hover {
 	transform: scale(1.1);
+}
+label.checkbox {
+	margin-right: 0.5em;
 }

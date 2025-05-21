@@ -105,50 +105,73 @@
   <div class="modal" id="add-server-modal">
     <div class="modal-background"></div>
     <div class="modal-card">
-      <header class="modal-card-head has-background-primary-soft has-text-primary-soft-invert py-4">
-        <p class="modal-card-title">Add Server</p>
-        <button class="delete is-large" aria-label="close"></button>
+      <header class="modal-card-head pb-0 pt-6"
+        style="flex-direction:column;align-items:stretch;background-color: #00000000;">
+        <div class="tabs is-fullwidth mb-0 is-boxed mt-auto" style="margin-bottom:0;">
+          <ul>
+
+            <li class="is-active" id="join-server-tab-btn"><a>Join Server</a></li>
+            <li id="add-server-tab-btn"><a>Add Server</a></li>
+          </ul>
+        </div>
       </header>
       <section class="modal-card-body">
-        <div class="field">
-          <label class="label">Server Name</label>
-          <div class="control">
-            <input class="input" type="text" id="serverNameInput" placeholder="Enter server name">
+        <!-- Add Server Tab Content -->
+        <div id="add-server-tab-content" style="display:none;">
+          <div class="field">
+            <label class="label">Server Name</label>
+            <div class="control">
+              <input class="input" type="text" id="serverNameInput" placeholder="Enter server name (caps matter)">
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Password</label>
+            <div class="control">
+              <input class="input" type="password" id="serverPasswordInput" placeholder="Enter server password">
+            </div>
+          </div>
+          <div class="field">
+            <label class="checkbox">
+              <input type="checkbox" id="serverOpen">
+              Open </label><span class="tag is-primary">Your server will not require a password, anyone with the server
+              name can join.</span>
+          </div>
+          <div class="field">
+            <label class="checkbox">
+              <input type="checkbox" id="serverUnlisted">
+              Unlisted
+            </label>
+            <span class="tag is-primary">Your server will not be publicly searchable. This does not stop any
+              joining.</span>
+          </div>
+          <div class="field">
+            <label class="checkbox">
+              <input type="checkbox" id="serverStoredMessaging" checked>
+              Stored Messaging </label><span class="tag is-primary">Saves sent messages on server for consistent message
+              history.</span>
           </div>
         </div>
-        <div class="field">
-          <label class="label">Password</label>
-          <div class="control">
-            <input class="input" type="password" id="serverPasswordInput" placeholder="Enter server password">
+        <!-- Join Server Tab Content -->
+        <div id="join-server-tab-content">
+          <div class="field">
+            <label class="label">Server Name</label>
+            <div class="control">
+              <input class="input" type="text" id="joinServerNameInput" placeholder="Enter server name">
+            </div>
           </div>
-        </div>
-        <div class="field">
-          <label class="checkbox">
-            <input type="checkbox" id="serverOpen">
-            Open <span class="tag is-primary">Your server will not require a password, anyone with the server name can
-              join.</span>
-          </label>
-        </div>
-        <div class="field">
-          <label class="checkbox">
-            <input type="checkbox" id="serverUnlisted">
-            Unlisted
-          </label>
-          <span class="tag is-primary">Your server will not be publicly searchable. This does not stop any
-            joining.</span>
-        </div>
-        <div class="field">
-          <label class="checkbox">
-            <input type="checkbox" id="serverStoredMessaging" checked>
-            Stored Messaging <span class="tag is-primary">Stores 100 msgs, if not on, messages will
-              only be delivered to online
-              peers.</span>
-          </label>
+          <div class="field">
+            <label class="label">Password</label>
+            <div class="control">
+              <input class="input" type="password" id="joinServerPasswordInput"
+                placeholder="Enter server password (if required)">
+            </div>
+          </div>
         </div>
       </section>
       <footer class="modal-card-foot">
         <div class="buttons">
-          <button class="button is-primary" id="add-server">Add Server</button>
+          <button class="button is-primary" id="add-server" style="display:none;">Add Server</button>
+          <button class="button is-primary" id="join-server">Join Server</button>
           <button class="button close">Cancel</button>
         </div>
       </footer>
@@ -226,7 +249,7 @@
     <div class="modal-card">
       <header class="modal-card-head has-background-primary-soft has-text-primary-soft-invert py-4">
         <p class="modal-card-title">Settings</p>
-        <button class="delete is-large" aria-label="close"></button>
+        <button class="delete is-large" aria-label="close" id="settings-delete"></button>
       </header>
       <section class="modal-card-body">
         <!-- Prefs list filled with prefs.json -->
@@ -370,7 +393,7 @@
       <footer class="modal-card-foot">
         <div class="buttons">
           <button class="button is-primary" id="settings-save">Save changes</button>
-          <button class="button close">Cancel</button>
+          <button class="button close" id="settings-close">Cancel</button>
         </div>
       </footer>
     </div>
@@ -379,6 +402,41 @@
   <script src="./renderer.js"></script>
   <script src="./audiovis.js"></script>
   <script src="./rtc.js"></script>
+  <script>
+    // Tab switching logic for Add/Join Server modal
+    const addTabBtn = document.getElementById('add-server-tab-btn');
+    const joinTabBtn = document.getElementById('join-server-tab-btn');
+    const addTabContent = document.getElementById('add-server-tab-content');
+    const joinTabContent = document.getElementById('join-server-tab-content');
+    const addServerBtn = document.getElementById('add-server');
+    const joinServerBtn = document.getElementById('join-server');
+
+    if (addTabBtn && joinTabBtn) {
+      addTabBtn.onclick = () => {
+        addTabBtn.classList.add('is-active');
+        joinTabBtn.classList.remove('is-active');
+        addTabContent.style.display = '';
+        joinTabContent.style.display = 'none';
+        addServerBtn.style.display = '';
+        joinServerBtn.style.display = 'none';
+      };
+      joinTabBtn.onclick = () => {
+        joinTabBtn.classList.add('is-active');
+        addTabBtn.classList.remove('is-active');
+        joinTabContent.style.display = '';
+        addTabContent.style.display = 'none';
+        joinServerBtn.style.display = '';
+        addServerBtn.style.display = 'none';
+      };
+      // Set default to Join Server tab
+      joinTabBtn.classList.add('is-active');
+      addTabBtn.classList.remove('is-active');
+      joinTabContent.style.display = '';
+      addTabContent.style.display = 'none';
+      joinServerBtn.style.display = '';
+      addServerBtn.style.display = 'none';
+    }
+  </script>
 </body>
 
 </html>

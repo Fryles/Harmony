@@ -3,7 +3,7 @@ const { app, BrowserWindow, ipcMain } = require("electron");
 const fs = require("fs");
 const path = require("path");
 // Enable live reload for all the files inside your project directory
-require("electron-reload")(__dirname);
+// require("electron-reload")(__dirname);
 
 function createWindow() {
 	// Create the browser window.
@@ -46,10 +46,10 @@ app.on("window-all-closed", function () {
 	if (process.platform !== "darwin") app.quit(); //win32 for windows
 });
 
-function getPrefs(event, windowId) {
+function getPrefs(event, accountId) {
 	try {
-		// Use windowId to determine prefs path
-		const id = windowId || (event && event.sender && event.sender.id);
+		// Use accountId to determine prefs path
+		const id = accountId || (event && event.sender && event.sender.id);
 		const prefsPath = path.join(__dirname, `prefs-${id}.json`);
 		if (fs.existsSync(prefsPath)) {
 			const prefs = fs.readFileSync(prefsPath);
@@ -63,7 +63,7 @@ function getPrefs(event, windowId) {
 	}
 }
 
-function updatePrefs(event, prefs, windowId) {
+function updatePrefs(event, prefs, accountId) {
 	// Validate that prefs is an object
 	if (prefs === "" || typeof prefs !== "object" || prefs === undefined) {
 		console.error("Invalid preferences format");
@@ -74,7 +74,7 @@ function updatePrefs(event, prefs, windowId) {
 	prefs = JSON.parse(JSON.stringify(prefs));
 
 	// Use windowId to determine prefs path (DEV)
-	const id = windowId || (event && event.sender && event.sender.id);
+	const id = accountId || (event && event.sender && event.sender.id);
 	const prefsPath = path.join(__dirname, `prefs-${id}.json`);
 
 	fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2));

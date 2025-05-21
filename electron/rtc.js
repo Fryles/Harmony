@@ -166,10 +166,6 @@ class rtcInterface {
 					break;
 			}
 		});
-
-		this.socket.on("uniquenessError", (e) => {
-			console.log(e);
-		});
 	}
 
 	callVoice(channel) {
@@ -370,6 +366,7 @@ class rtcInterface {
 
 	gotRing(msg) {
 		console.log(`Received voiceRing on ${msg.channel} from ${msg.user}`);
+
 		if (this.ring) {
 			//already a ring, ignore this new one
 			console.log("Already ringing, ignoring new ring");
@@ -386,8 +383,20 @@ class rtcInterface {
 			this.voiceJoin(this.mediaChannel);
 			return;
 		} else if (this.mediaChannel) {
+			// --- Show toast with server or user name ---
+			const server = localPrefs.servers.find(
+				(s) => s.secret === msg.channel.split(":")[1]
+			);
+			const user = userLookup(msg.from);
+			if (server) {
+				showToast(
+					`${user.nick ? user.nick : user.name} calling on ${server.name}`
+				);
+			} else {
+				showToast(`Incoming call from ${user.nick ? user.nick : user.name}`);
+			}
 			return;
-			//already in a vc, handle later
+			//already in a vc
 		}
 		this.ring.audio.loop = true;
 		this.ring.audio.volume = localPrefs.audio.ringVolume
@@ -399,6 +408,17 @@ class rtcInterface {
 		document.getElementById("voice-call").classList.add("ringing");
 		document.getElementById("voice-call").classList.add("pickup");
 		addVoiceUser(msg.user);
+		const server = localPrefs.servers.find(
+			(s) => s.id === msg.channel.split(":")[1]
+		);
+		const user = userLookup(msg.from);
+		if (server) {
+			showToast(
+				`${user.nick ? user.nick : user.name} calling on ${server.name}`
+			);
+		} else {
+			showToast(`Incoming call from ${user.nick ? user.nick : user.name}`);
+		}
 		//set timeout for ring end
 		this.ring.timeout = setTimeout(() => {
 			if (this.ring && this.mediaChannel != this.ring.channel) {
@@ -421,7 +441,8 @@ class rtcInterface {
 		const [type, base] = newChannel.split(":");
 		if (!type || !base || base.length === 0) {
 			console.error(
-				"Invalid channel format. Must be type:base with non-empty base."
+				"Invalid channel format. Must be type:base with non-empty base.",
+				newChannel
 			);
 			return;
 		}
@@ -431,9 +452,12 @@ class rtcInterface {
 			);
 			return;
 		}
-		if (newChannel == this.mediaChannel) {
+		if (
+			newChannel == this.mediaChannel ||
+			newChannel == this.signalingChannel
+		) {
 			//joining same channel, do nothing.
-			console.log("attempted to join mediaChannel again");
+			console.warn("attempted to join channel again");
 			return;
 		}
 		// if joining a voice/video channel, stop all stream connections to any voice/video channels
@@ -691,21 +715,42 @@ class rtcInterface {
 			}
 		};
 
-		pc.setRemoteDescription(new RTCSessionDescription(offer))
-			.then(() => pc.createAnswer())
-			.then((answer) => pc.setLocalDescription(answer))
-			.then(() => {
-				this.sendSignalingMessage(this.signalingChannel, peerId, {
-					type: "answer",
-					answer: pc.localDescription,
+		// --- Add state check before setRemoteDescription ---
+		if (
+			pc.signalingState === "stable" ||
+			pc.signalingState === "have-local-offer" ||
+			pc.signalingState === "have-remote-offer"
+		) {
+			pc.setRemoteDescription(new RTCSessionDescription(offer))
+				.then(() => pc.createAnswer())
+				.then((answer) => pc.setLocalDescription(answer))
+				.then(() => {
+					this.sendSignalingMessage(this.signalingChannel, peerId, {
+						type: "answer",
+						answer: pc.localDescription,
+					});
 				});
-			});
+		} else {
+			console.warn(
+				`handleOffer: Skipping setRemoteDescription due to signalingState=${pc.signalingState}`
+			);
+		}
 	}
 
 	handleAnswer(peerId, answer) {
 		const pc = this.peerConnections[peerId];
 		if (pc) {
-			pc.setRemoteDescription(new RTCSessionDescription(answer));
+			// --- Add state check before setRemoteDescription ---
+			if (
+				pc.signalingState === "have-local-offer" ||
+				pc.signalingState === "have-remote-offer"
+			) {
+				pc.setRemoteDescription(new RTCSessionDescription(answer));
+			} else {
+				console.warn(
+					`handleAnswer: Skipping setRemoteDescription due to signalingState=${pc.signalingState}`
+				);
+			}
 		}
 	}
 
@@ -840,7 +885,7 @@ class rtcInterface {
 			};
 			updateGainBasedOnAmplitude();
 		} catch (err) {
-			console.error("Could not get local audio:", err);
+			console.warn("Could not get local audio:", err);
 			showToast("Missing Audio Input Device");
 		}
 	}

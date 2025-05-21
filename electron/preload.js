@@ -8,25 +8,30 @@
  */
 const { contextBridge, ipcRenderer } = require("electron");
 var prefs;
+var accId = false;
 contextBridge.exposeInMainWorld("electronAPI", {
-	updatePrefs: (prefs) => ipcRenderer.send("update-prefs", prefs),
-	getPrefs: () => ipcRenderer.invoke("get-prefs"),
+	updatePrefs: (prefs, accId) => ipcRenderer.send("update-prefs", prefs, accId),
+	getPrefs: (accId) => ipcRenderer.invoke("get-prefs", accId),
 	loadPrefs: (prefs) => loadPrefs(prefs),
 	getPsuedoUser: (userId) => psuedoUser(userId),
 });
 
 // load prefs here
 window.addEventListener("DOMContentLoaded", async () => {
-	prefs = await ipcRenderer.invoke("get-prefs");
+	prefs = await ipcRenderer.invoke("get-prefs", accId);
 	if (prefs == "") {
 		//no prefs.json
 		prefs = defaultPrefs();
 		prefs = await autoUpdateDevices(prefs);
 		console.log("Updating prefs with : ", prefs);
-		ipcRenderer.send("update-prefs", prefs);
+		ipcRenderer.send("update-prefs", prefs, accId);
 		loadPrefs(prefs);
 		openModal("settings-modal");
-		settingsInit();
+		// Hide settings-delete and settings-close elements
+		const del = document.getElementById("settings-delete");
+		if (del) del.style.display = "none";
+		const close = document.getElementById("settings-close");
+		if (close) close.style.display = "none";
 	} else {
 		//we already have prefs, attempt to update w/ connected devices
 
@@ -36,6 +41,16 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 function loadFriends(prefs) {
+	// Clear all children except #friends-header
+	const friendsContainer = document.getElementById("friends");
+	if (friendsContainer) {
+		Array.from(friendsContainer.children).forEach((child) => {
+			if (child.id !== "friends-header") {
+				friendsContainer.removeChild(child);
+			}
+		});
+	}
+
 	let friends = prefs.friends;
 	friends.forEach((friend) => {
 		let el = document.createElement("div");
@@ -50,6 +65,17 @@ function loadFriends(prefs) {
 }
 
 function loadServers(prefs) {
+	// Only keep the friends button in the server list
+	const serverList = document.getElementById("server-list");
+	if (serverList) {
+		// Remove all children except the one with name == "HARMONY-FRIENDS-LIST"
+		Array.from(serverList.children).forEach((child) => {
+			if (child.getAttribute("name") !== "HARMONY-FRIENDS-LIST") {
+				serverList.removeChild(child);
+			}
+		});
+	}
+
 	let servers = prefs.servers;
 	servers.forEach((server) => {
 		let el = document.createElement("div");
@@ -64,13 +90,13 @@ function loadServers(prefs) {
 			name = name.substring(0, 5);
 		}
 		el.innerText = name;
-		document.getElementById("server-list").appendChild(el);
+		serverList.appendChild(el);
 	});
 
 	//add add server button
 	let el =
 		"<div class='server-item' name='HARMONY-ADD-SERVER'><i class='fas fa-lg fa-plus-circle'></i></div>";
-	document.getElementById("server-list").innerHTML += el;
+	serverList.innerHTML += el;
 }
 
 //bulma js
@@ -89,31 +115,16 @@ function defaultPrefs() {
 			userId: uid,
 			password: "",
 		},
-		servers: [
-			{
-				name: "pub",
-				id: pub,
-				password: "",
-			},
-		],
+		servers: [],
 		settings: {
 			theme: "dark",
-			accentColor: "#856bf9",
+			accentColor: "#3bdbcd",
 			language: "en-US",
 			notifications: true,
 			checkUpdate: true,
 			maxMsgHistory: 50,
 		},
-		friends: [
-			{
-				name: "buh",
-				nick: "",
-				id: "whatmybabysaid",
-				chat: "BUHCHAT",
-				color: "#056bf9",
-				volume: 1.0,
-			},
-		],
+		friends: [],
 		devices: {
 			videoInputDevices: [],
 			audioInputDevices: [],

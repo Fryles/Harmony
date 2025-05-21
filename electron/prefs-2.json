@@ -1,38 +1,56 @@
 {
   "user": {
-    "username": "newuser",
-    "userId": "78fc19d8-f580-4632-aa1b-149244604644",
-    "password": "asd"
+    "username": "Fluffy Ghost",
+    "userId": "f842a398-9470-4644-8165-64aad570267f",
+    "password": "12345678"
   },
   "servers": [
     {
-      "name": "pub",
-      "id": 123,
-      "password": ""
+      "name": "test",
+      "id": "53c8df7d-bffb-4c31-852d-250f56be703c",
+      "secret": "a4329d503dd23225bd88b60b0bb23cddbd3e7ac790d317f7ce214064f50e8e57",
+      "options": {
+        "serverOpen": false,
+        "serverUnlisted": false,
+        "serverStoredMessaging": true
+      },
+      "admin": "78fc19d8-f580-4632-aa1b-149244604644",
+      "messages": []
+    },
+    {
+      "name": "sovo sovo",
+      "id": "9ed37836-dace-4f71-a311-424f58170a5f",
+      "secret": "e8d13cfb6a8fe5ee135657438bf85dba8b6fe26f5bce27d66e019bd1d691fa79",
+      "options": {
+        "serverOpen": false,
+        "serverUnlisted": false,
+        "serverStoredMessaging": true
+      },
+      "admin": "f842a398-9470-4644-8165-64aad570267f",
+      "messages": []
+    },
+    {
+      "name": "asd",
+      "id": "3a517a7a-3eaa-42a3-816e-897896688e1e",
+      "secret": "203c790f8bd5be13358d46f597d369ab1bf967f05590e88d0b51def33b7154b6",
+      "options": {
+        "serverOpen": true,
+        "serverUnlisted": false,
+        "serverStoredMessaging": true
+      },
+      "admin": "f842a398-9470-4644-8165-64aad570267f",
+      "messages": []
     }
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#ff5599",
+    "accentColor": "#8cdbab",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true,
     "maxMsgHistory": 50
   },
-  "friends": [
-    {
-      "name": "buh",
-      "nick": "",
-      "id": "whatmybabysaid",
-      "chat": "BUHCHAT"
-    },
-    {
-      "name": "da967034-e08a-4d8f-b377-8bf1df9ff1ac",
-      "id": "da967034-e08a-4d8f-b377-8bf1df9ff1ac",
-      "chat": "0d5c918402d2305bbcf3d821f563aa6b464c5ba8de58f2a9",
-      "volume": 1.47
-    }
-  ],
+  "friends": [],
   "devices": {
     "videoInputDevices": [],
     "audioInputDevices": [
@@ -83,10 +101,10 @@
     "videoInputDevice": null
   },
   "audio": {
-    "inputGain": 0.87,
-    "outputVolume": 0.66,
-    "hotMicThresh": 0.07,
+    "inputGain": 1.59,
+    "outputVolume": 0.53,
+    "hotMicThresh": 0.1,
     "enableNoiseSuppression": true,
-    "ringVolume": 0.43
+    "ringVolume": 0.08
   }
 }

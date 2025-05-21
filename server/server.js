@@ -9,7 +9,6 @@ import crypto from "crypto";
 
 // ENVIRONMENT VARIABLES
 const PORT = process.env.PORT || 3000;
-const TOKEN = process.env.TOKEN || "SIGNALING123";
 
 // SETUP SERVERS
 const app = express();
@@ -25,18 +24,11 @@ const db = await JSONFilePreset("db.json", {
 	servers: {},
 });
 
-//friend requests used to store pending requests that have not been accepted/denied
-//friend requests, {id: [{from,fromName,secret,timestamp}...]}
-//await db.update(({ requests }) => (requests[id].push({from,fromName,secret,timestamp})));
-
-//users holds auth/reg data for our... users
-//users, {id: { name, secret, session, sessionTimestamp }}
-
-//ips keeps fraud account registering in check. only 420 accountRegisters per IP
-//ips, ip: numRegs
-
-//servers stores data for lookup, admin privs (pwd change, etc.), and message history (if enabled on creation)
-//servers, {key:[{msgObj}...]}
+//throttles/security
+const pepper = Math.round(Math.random() * 420);
+console.log("pepper: ", pepper);
+const addServerThrottle = {};
+const addUserThrottle = {};
 
 // AUTHENTICATION MIDDLEWARE
 io.use(async (socket, next) => {
@@ -73,8 +65,29 @@ io.use(async (socket, next) => {
 		console.log("client logged in, sending session w/ ready");
 		return next();
 	} else if (!db.data.users[userId]) {
+		// Limit account creation per IP
+		const ip = socket.handshake.address;
+		const now = Date.now();
+		const DAY = 24 * 60 * 60 * 1000;
+		if (!addUserThrottle[ip]) {
+			addUserThrottle[ip] = [];
+		}
+		// Remove timestamps older than 24 hours
+		addUserThrottle[ip] = addUserThrottle[ip].filter((ts) => now - ts < DAY);
+		if (addUserThrottle[ip].length >= 4) {
+			console.log("Account creation limit reached for IP:", ip);
+			let err = new Error(
+				"Account creation limit reached for this IP. Try again later."
+			);
+			err.message =
+				"Account creation limit reached for this IP. Try again later.";
+			return next(err);
+		}
+		addUserThrottle[ip].push(now);
+
 		//TODO add username validation
 		const userName = socket.handshake.auth.userName;
+
 		//no user for this id, registering and giving token
 		await db.update(
 			({ users }) =>
@@ -389,7 +402,132 @@ io.on("connection", (socket) => {
 		callback({ incoming, outgoing });
 	});
 
-	socket.on("serverQuery", async (server, callback) => {});
+	socket.on("serverAuth", async (name, id, secret, callback) => {
+		const servers = db.data.servers || {};
+		if (
+			callback &&
+			servers[name] &&
+			servers[name].id === id &&
+			servers[name].secret === secret
+		) {
+			//good auth
+			callback(servers[name]);
+		} else {
+			//fail
+			callback(false);
+		}
+	});
+
+	socket.on("serverQuery", async (name, exact, callback) => {
+		if (!name) {
+			if (callback) callback([]);
+			return;
+		}
+		var matches;
+		const servers = db.data.servers || {};
+		if (exact) {
+			matches = Object.values(servers).filter((s) => s.name === name);
+			if (matches.length === 0) {
+				matches = [
+					{
+						name: name,
+						id: generateUuidBySeed(name),
+					},
+				];
+			}
+		} else {
+			name = name.toLowerCase();
+			matches = Object.values(servers).filter((s) =>
+				s.name.toLowerCase().includes(name)
+			);
+			//filter matches to only open servers
+			matches = matches.filter((s) => {
+				if (!s.options.serverUnlisted) {
+					return s;
+				}
+			});
+		}
+
+		// Map matches to only return name and id
+		matches = matches.map((s) => ({ name: s.name, id: s.id }));
+
+		if (callback) callback(matches);
+	});
+
+	socket.on("registerServer", async (server, callback) => {
+		const userId = socket.handshake.auth.userId;
+		const now = Date.now();
+
+		if (
+			addServerThrottle[userId] &&
+			now - addServerThrottle[userId] < 6 * 60 * 60 * 1000 // 6 hours
+		) {
+			if (callback)
+				callback({
+					success: false,
+					error: "You can only create a server once every 6 hours.",
+				});
+			return;
+		}
+
+		//takes name, id, secret, and options object
+		const uuidV4Regex =
+			/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+		const id = server?.id;
+		let name = server?.name;
+		if (!id || !uuidV4Regex.test(id)) {
+			if (callback) callback({ success: false, error: "Invalid server id" });
+			return;
+		}
+		if (
+			!name ||
+			typeof name !== "string" ||
+			name.length > 32 ||
+			name.length < 3
+		) {
+			if (callback) callback({ success: false, error: "Invalid server name" });
+			return;
+		}
+		// Sanitize name: trim, collapse spaces, limit length, remove special chars/emojis/accented chars
+		name = name
+			.normalize("NFD") // decompose accented chars
+			.replace(/[\u0300-\u036f]/g, "") // remove accents
+			.replace(/[^\x20-\x7E]/g, "") // remove non-ASCII (emojis, symbols)
+			.replace(/[^a-zA-Z0-9 ]/g, "") // remove special chars except space
+			.trim()
+			.replace(/\s+/g, " ")
+			.slice(0, 32);
+
+		if (name.length === 0 || name.length > 32 || name.length < 3) {
+			if (callback) callback({ success: false, error: "Invalid server name" });
+			return;
+		}
+
+		// Check if server id already exists
+		if (db.data.servers[name]) {
+			if (callback)
+				callback({ success: false, error: "Server name already exists" });
+			return;
+		}
+
+		const safeServer = {
+			name: name,
+			id: id,
+			secret: server.secret,
+			options: {
+				serverOpen: server.options.serverOpen,
+				serverUnlisted: server.options.serverUnlisted,
+				serverStoredMessaging: server.options.serverStoredMessaging,
+			},
+			admin: userId,
+			messages: [],
+		};
+		db.data.servers[name] = safeServer;
+		await db.write();
+
+		addServerThrottle[userId] = now;
+		if (callback) callback({ success: true, server: safeServer });
+	});
 
 	socket.on("cancelFriendRequest", async (req) => {
 		const userId = socket.handshake.auth.userId;
@@ -439,3 +577,25 @@ app.use(sirv("public"));
 
 // RUN APP
 server.listen(PORT, console.log(`Listening on PORT ${PORT}`));
+
+//util for fake server id
+function generateUuidBySeed(seedString) {
+	//add per server session salt to hash to stop guessing of fake uuids
+	seedString = `${seedString}${pepper}`;
+	//Enumerating unlisted servers is still possible between server restarts
+	//TODO make pepper a ENV maybe
+	const hash = crypto.createHash("sha256").update(seedString).digest("hex");
+
+	// UUID version 4 consists of 32 hexadecimal digits in the form:
+	// 8-4-4-4-12 (total 36 characters including hyphens)
+
+	const uuid = [
+		hash.substring(0, 8),
+		hash.substring(8, 12),
+		"4" + hash.substring(12, 15), // Set the version to 4
+		"8" + hash.substring(15, 18), // Set the variant to 8 (RFC 4122)
+		hash.substring(18, 30),
+	].join("-");
+
+	return uuid;
+}
