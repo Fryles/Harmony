@@ -3,7 +3,7 @@ const { app, BrowserWindow, ipcMain } = require("electron");
 const fs = require("fs");
 const path = require("path");
 // Enable live reload for all the files inside your project directory
-// require("electron-reload")(__dirname);
+require("electron-reload")(__dirname);
 
 function createWindow() {
 	// Create the browser window.

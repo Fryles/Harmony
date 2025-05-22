@@ -1,16 +1,17 @@
 {
-	"name": "harmony_signaling",
+	"name": "harmony_server",
 	"version": "1.0",
-	"description": "Socket.io signaling, with rooms.",
+	"description": "Socket.io server for Harmony",
 	"main": "server.js",
 	"type": "module",
 	"repository": "",
 	"author": "fryles",
-	"license": "give me 10%",
+	"license": "give me 10% or i will sue you",
 	"scripts": {
 		"start": "node server.js"
 	},
 	"dependencies": {
+		"@socket.io/admin-ui": "^0.5.1",
 		"cors": "^2.8.5",
 		"express": "^4.17.1",
 		"lowdb": "^7.0.1",
@@ -23,6 +24,6 @@
 		"nodemon": "^3.1.10"
 	},
 	"engines": {
-		"node": ">=16.x <18.x"
+		"node": ">=16.x <23.11.x"
 	}
 }

@@ -17,10 +17,13 @@ main();
 
 async function main() {
 	//set save listener incase first load
-	document.getElementById("settings-save").addEventListener("click", () => {
-		storePrefs();
-		closeModals();
-	});
+	document
+		.getElementById("settings-save")
+		.addEventListener("click", async () => {
+			if (await storePrefs()) {
+				closeModals();
+			}
+		});
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
 
@@ -84,11 +87,11 @@ async function main() {
 		if (localPrefs.friends.length > 0) {
 			let firstFriend = document.getElementsByName(localPrefs.friends[0].id)[0];
 			if (firstFriend && !selectedFriend) {
-				selectFriend(firstFriend);
+				FriendsManager.selectFriend(firstFriend);
 			}
 		}
 		document.querySelectorAll(".friend-item").forEach((div) => {
-			div.addEventListener("click", selectFriend, true);
+			div.addEventListener("click", FriendsManager.selectFriend, true);
 			//add manage friend button if not already present
 			if (div.querySelector(".icon")) {
 				return;
@@ -132,8 +135,8 @@ async function main() {
 						);
 						div.appendChild(manageBtn);
 						div.setAttribute("name", friend.id);
-						div.onclick = selectFriend;
-						div.addEventListener("click", selectFriend, true);
+						div.onclick = FriendsManager.selectFriend;
+						div.addEventListener("click", FriendsManager.selectFriend, true);
 						//close modal
 						closeModals();
 					};
@@ -169,7 +172,7 @@ async function main() {
 		if (Array.isArray(localPrefs.servers)) {
 			localPrefs.servers.forEach((server) => {
 				if (server.secret) {
-					rtc.joinChannel(server.secret);
+					rtc.joinChannel(`chat:${server.secret}`);
 				}
 			});
 		}
@@ -177,7 +180,7 @@ async function main() {
 		if (Array.isArray(localPrefs.friends)) {
 			localPrefs.friends.forEach((friend) => {
 				if (friend.chat) {
-					rtc.joinChannel(friend.chat);
+					rtc.joinChannel(`chat:${friend.chat}`);
 				}
 			});
 		}
@@ -567,8 +570,8 @@ function displayChat(chatId) {
 	messages.forEach((msg) => {
 		updateChat(msg);
 	});
-	//connect to chat rtc (it will prepend type to chatID for us)
-	rtc.joinChannel(currentChat);
+	//connect to chat rtc
+	// rtc.joinChannel(currentChat);
 }
 
 function updateChat(msg) {
@@ -584,11 +587,14 @@ function updateChat(msg) {
 	let el = document.createElement("p");
 	let un = document.createElement("span");
 	un.className = "tag";
-	if (msg.user == selfId) {
+	if (msg.color) {
+		un.style.backgroundColor = msg.color;
+		un.style.color = HarmonyUtils.getBestTextColor(msg.color);
+	} else if (msg.user == selfId) {
 		un.classList.add("is-primary");
+	}
+	if (msg.user == selfId) {
 		el.style = "text-align: end;";
-	} else if (msg.color) {
-		el.style = `background-color: ${msg.color}`;
 	}
 
 	let username = msg.username;
@@ -601,9 +607,22 @@ function updateChat(msg) {
 			? `${sender.nick} (${sender.name})`
 			: sender.name
 	);
-	el.innerHTML = "";
+	un.setAttribute("data-user-id", msg.user);
+	un.setAttribute("data-timestamp", msg.timestamp);
+
 	el.appendChild(un);
-	el.innerHTML += "<br>" + sanitizedContent;
+	el.appendChild(document.createElement("br"));
+	el.appendChild(document.createTextNode(sanitizedContent));
+
+	if (msg.user != selfId) {
+		// Add click handler to open user popup
+		un.classList.add("is-clickable");
+		un.addEventListener("click", function (e) {
+			e.stopPropagation();
+			manageChatUser(un);
+		});
+	}
+
 	document.getElementById("chat-messages").appendChild(el);
 	// Auto-scroll to bottom
 	const chatMessages = document.getElementById("chat-messages");
@@ -612,7 +631,6 @@ function updateChat(msg) {
 
 function storeChat(msg, chatId) {
 	//TODO THIS IS KINDA BLOATED
-
 	//adds message to respective chat and stores it
 	const key = chatId;
 	let messages = [];
@@ -680,13 +698,13 @@ function selectFriend(e) {
 		}
 		return;
 	}
-	// Remove 'selected' class from all server items except the clicked one
+	// Remove 'selected' class from all friend items except the clicked one
 	document.querySelectorAll(".friend-item.selected").forEach((item) => {
 		if (item !== el) {
 			item.classList.remove("selected");
 		}
 	});
-	// Add 'selected' class to the clicked server item
+	// Add 'selected' class to the clicked friend item
 	el.classList.add("selected");
 	selectedFriend = el.getAttribute("name");
 	let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
@@ -697,14 +715,20 @@ function selectFriend(e) {
 	}
 }
 
-function showFriendRequests(e) {
-	removeClassFromAll(".friends-menu-item > i", "active");
+function showFriendRequests() {
+	HarmonyUtils.removeClassFromAll(".friends-menu-item > i", "active");
 	document.getElementById("friendRequestsViewBtn").classList.add("active");
 	const friendsContainer = document.getElementById("friends");
-	removeAllChildren(friendsContainer, ".friend-item", "friends-header");
-	removeAllChildren(friendsContainer, ".friend-request-item");
+	HarmonyUtils.removeAllChildren(
+		friendsContainer,
+		".friend-item",
+		"friends-header"
+	);
+	HarmonyUtils.removeAllChildren(friendsContainer, ".friend-request-item");
 
-	const requests = friendReqs.incoming || [];
+	const requests = Array.isArray(friendReqs.incoming)
+		? friendReqs.incoming
+		: [];
 	if (requests.length === 0) {
 		const noReq = document.createElement("div");
 		noReq.className = "friend-request-item";
@@ -736,7 +760,7 @@ function showFriendRequests(e) {
 				chat: req.chat,
 			});
 			window.electronAPI.updatePrefs(localPrefs);
-			showToast(`${DOMPurify(request.fromName)} Is Now Your Friend!`);
+			showToast(`${DOMPurify(req.fromName)} Is Now Your Friend!`);
 		};
 		reqDiv.querySelector(".reject-friend-request").onclick = () => {
 			req.status = "rejected";
@@ -748,7 +772,9 @@ function showFriendRequests(e) {
 		friendsContainer.appendChild(reqDiv);
 	});
 
-	const outgoingReqs = friendReqs.outgoing || [];
+	const outgoingReqs = Array.isArray(friendReqs.outgoing)
+		? friendReqs.outgoing
+		: [];
 	if (outgoingReqs.length > 0) {
 		const outgoingDiv = document.createElement("div");
 		outgoingDiv.className =
@@ -776,15 +802,23 @@ function showFriendRequests(e) {
 }
 
 function showFriends(e) {
-	removeClassFromAll(".friends-menu-item > i", "active");
+	HarmonyUtils.removeClassFromAll(".friends-menu-item > i", "active");
 	document.getElementById("friendsViewBtn").classList.add("active");
 
 	const friendsContainer = document.getElementById("friends");
-	removeAllChildren(friendsContainer, ".friend-request-item");
-	removeAllChildren(friendsContainer, ".friend-item", "friends-header");
+	HarmonyUtils.removeAllChildren(friendsContainer, ".friend-request-item");
+	HarmonyUtils.removeAllChildren(
+		friendsContainer,
+		".friend-item",
+		"friends-header"
+	);
 
 	if (localPrefs && Array.isArray(localPrefs.friends)) {
-		populateFriendsList(friendsContainer, localPrefs.friends, selectFriend);
+		HarmonyUtils.populateFriendsList(
+			friendsContainer,
+			localPrefs.friends,
+			selectFriend
+		);
 	}
 }
 
@@ -798,12 +832,18 @@ async function selectServerItem(e) {
 		}
 		return;
 	}
-	selectedServer = e.target.getAttribute("name");
-	if (selectedServer == "HARMONY-ADD-SERVER") {
+	if (selectedServer == e.target.getAttribute("name")) {
+		//same server we already selected...
+		showToast("Already viewing this server");
+		return;
+	}
+	if (e.target.getAttribute("name") == "HARMONY-ADD-SERVER") {
 		//open add server modal
 		openModal("add-server-modal");
 		return;
 	}
+
+	selectedServer = e.target.getAttribute("name");
 	// Remove 'selected' class from all server items except the clicked one
 	document.querySelectorAll(".server-item.selected").forEach((item) => {
 		if (item !== e.target) {
@@ -815,14 +855,15 @@ async function selectServerItem(e) {
 
 	const friendsEl = document.getElementById("friends");
 	const chatEl = document.getElementById("chat");
-
+	var chat;
 	if (selectedServer == "HARMONY-FRIENDS-LIST") {
 		friendsEl.classList.remove("slide-away");
 		chatEl.classList.remove("expand");
 
 		let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
 		if (privFriend && privFriend.chat) {
-			displayChat(privFriend.chat);
+			chat = privFriend.chat;
+			displayChat();
 		} else {
 			//no friend chat to display, show empty chat
 			displayChat(null);
@@ -838,11 +879,23 @@ async function selectServerItem(e) {
 			privServer.secret !== null &&
 			privServer.secret !== undefined
 		) {
-			let chat = privServer.secret;
+			chat = privServer.secret;
 			displayChat(chat);
 		} else {
 			console.log("Error finding Server password for ", selectedServer);
 		}
+	}
+	//if we are not in a mediaChannel, clear voice and update to new server when switching
+	if (!rtc.mediaChannel) {
+		// Clear all .voice-prof elements in #voice-list
+		const voiceList = document.getElementById("voice-list");
+		if (voiceList) {
+			voiceList.querySelectorAll(".voice-prof").forEach((el) => el.remove());
+		}
+		socket.emit("channelQuery", `voice:${chat}`, (res) => {
+			//check if anyone is in new channels vc
+			console.log(res);
+		});
 	}
 }
 
@@ -867,7 +920,8 @@ async function storePrefs() {
 	const accentColorEl = document.getElementById("accentColor");
 	if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(accentColorEl.value)) {
 		validateField(accentColorEl);
-		return;
+		showToast(`${accentColorEl.value} is not a valid hex color code`);
+		return false;
 	}
 	localPrefs.settings.accentColor = accentColorEl.value;
 	localPrefs.settings.theme = getVal("theme");
@@ -876,29 +930,33 @@ async function storePrefs() {
 	const usernameEl = document.getElementById("username");
 	if (!usernameEl.value) {
 		validateField(usernameEl);
-		return;
+		showToast("Username can't be empty dingus");
+		return false;
+	}
+	if (usernameEl.length > 15) {
+		validateField(usernameEl);
+		showToast("Username can't be longer than 15 chars");
+		return false;
 	}
 	localPrefs.user.username = usernameEl.value;
 
 	const passwordEl = document.getElementById("password");
-	if (!passwordEl.value) {
-		validateField(passwordEl);
-		return;
-	}
 	// Password complexity check for user password
 	if (
-		passwordEl.value !== localPrefs.user.password &&
-		!isPasswordComplex(passwordEl.value)
+		!passwordEl.value ||
+		(passwordEl.value !== localPrefs.user.password &&
+			!isPasswordComplex(passwordEl.value))
 	) {
+		validateField(passwordEl);
 		showToast("Password must be at least 8 characters.");
-		return;
+		return false;
 	}
 	if (passwordEl.value !== localPrefs.user.password)
 		changePass(passwordEl.value);
 
 	["videoInputDevice", "audioInputDevice", "audioOutputDevice"].forEach(
 		(id) => {
-			localPrefs.devices[id] = getSelectedDevice(
+			localPrefs.devices[id] = HarmonyUtils.getSelectedDevice(
 				id,
 				localPrefs.devices[id + "s"]
 			);
@@ -909,10 +967,10 @@ async function storePrefs() {
 		localPrefs.audio[id] = parseFloat(getVal(id));
 	});
 	localPrefs.audio.enableNoiseSuppression = getChk("enableNoiseSuppression");
-	console.log("stored prefs");
 
 	window.electronAPI.updatePrefs(localPrefs);
 	window.electronAPI.loadPrefs(localPrefs);
+	return true;
 }
 
 function manageVoiceUser(e) {
@@ -1035,10 +1093,116 @@ function manageVoiceUser(e) {
 	}, 10);
 }
 
+function manageChatUser(msgEl) {
+	if (!msgEl) return;
+
+	// Try to extract userId and timestamp from the message element or event
+	let userId = msgEl.getAttribute("data-user-id");
+	let timestamp = msgEl.getAttribute("data-timestamp");
+
+	if (!userId || !timestamp) {
+		// Not enough info to show popup
+		showToast("User info not available for this message.");
+		return;
+	}
+
+	// Remove any existing popup
+	const existingPopup = document.getElementById("chat-user-popup");
+	if (existingPopup) existingPopup.remove();
+
+	let friend = userLookup(userId);
+	let username = DOMPurify.sanitize(
+		friend.nick != "" && friend.nick != undefined
+			? `${friend.nick} (${friend.name})`
+			: friend.name
+	);
+
+	// Format timestamp
+	let ts = new Date(Number(timestamp));
+	let tsStr = ts.toLocaleString();
+
+	// Determine if already a friend
+	let isFriend = localPrefs.friends.some((f) => f.id === userId);
+
+	// Create popup
+	const popup = document.createElement("div");
+	popup.id = "chat-user-popup";
+	popup.style.position = "absolute";
+	popup.style.zIndex = 10000;
+	popup.style.background = "#23272a";
+	popup.style.border = "1px solid #444";
+	popup.style.borderRadius = "10px";
+	popup.style.padding = "1rem";
+	popup.style.boxShadow = "0 2px 10px rgba(0,0,0,0.4)";
+	popup.style.width = "250px";
+	popup.style.color = "#fff";
+	popup.innerHTML = `
+		<div style="margin-bottom: 0.5rem; font-weight: bold;">${username}</div>
+		<div style="font-size:0.9em;margin-bottom:0.5rem;">
+			<span class="is-clickable" style="color: var(--bulma-grey-light)" onclick="navigator.clipboard.writeText('${userId}');showToast('Copied User ID');">${userId}</span>
+		</div>
+		<div style="font-size:0.9em;margin-bottom:0.5rem;">
+			<span>Sent: ${DOMPurify.sanitize(tsStr)}</span>
+		</div>
+		${
+			isFriend
+				? `<button class="button is-small is-danger" id="removeFriendChatBtn" style="width:100%;margin-bottom:0.3rem;">
+					<i class="fas fa-user-minus"></i> Remove Friend
+				</button>`
+				: `<button class="button is-small is-link" id="addFriendChatBtn" style="width:100%;margin-bottom:0.3rem;">
+					<i class="fas fa-user-plus"></i> Add Friend
+				</button>`
+		}
+	`;
+
+	// Position popup near the message element, depending on if self or not
+	const rect = msgEl.getBoundingClientRect();
+	if (userId == selfId) {
+		popup.style.top = `${rect.top + window.scrollY - 50}px`;
+		popup.style.left = `${rect.left + window.scrollX - 260}px`;
+	} else {
+		popup.style.top = `${rect.top + window.scrollY - 50}px`;
+		popup.style.left = `${rect.left + window.scrollX + 100}px`;
+	}
+	document.body.appendChild(popup);
+
+	// Add friend/remove friend logic
+	if (isFriend) {
+		const removeBtn = popup.querySelector("#removeFriendChatBtn");
+		removeBtn.onclick = () => {
+			// Remove friend from localPrefs
+			localPrefs.friends = localPrefs.friends.filter((f) => f.id !== userId);
+			window.electronAPI.updatePrefs(localPrefs);
+			showToast("Removed Friend");
+			popup.remove();
+			showFriends();
+		};
+	} else {
+		const addBtn = popup.querySelector("#addFriendChatBtn");
+		addBtn.onclick = () => {
+			sendFriendReq(userId);
+			popup.remove();
+		};
+	}
+
+	// Close popup on outside click
+	const closePopup = (evt) => {
+		if (!popup.contains(evt.target)) {
+			popup.remove();
+			document.removeEventListener("mousedown", closePopup, true);
+		}
+	};
+	setTimeout(() => {
+		document.addEventListener("mousedown", closePopup, true);
+	}, 10);
+}
+
 function validateField(element) {
 	element.classList.add("is-danger");
 	element.focus();
-	setTimeout(element.classList.remove("is-danger"), 5000);
+	setTimeout(() => {
+		element.classList.remove("is-danger");
+	}, 3000);
 }
 
 //hash password to hex str
@@ -1086,62 +1250,56 @@ function closeModals() {
 	}
 }
 
-// Utility: Remove a class from all elements matching selector
-function removeClassFromAll(selector, className) {
-	document
-		.querySelectorAll(selector)
-		.forEach((el) => el.classList.remove(className));
-}
-
-// Utility: Remove all children matching selector from parent
-function removeAllChildren(parent, selector, exceptId) {
-	parent.querySelectorAll(selector).forEach((item) => {
-		if (!exceptId || item.id !== exceptId) item.remove();
-	});
-}
-
-// Utility: Repopulate friends list
-function populateFriendsList(container, friends, clickHandler) {
-	friends.forEach((friend) => {
-		const friendDiv = document.createElement("div");
-		friendDiv.className = "friend-item";
-		friendDiv.setAttribute("name", DOMPurify.sanitize(friend.id));
-		friendDiv.textContent = DOMPurify.sanitize(
-			friend.nick ? `${friend.nick} (${friend.name})` : friend.name
-		);
-		friendDiv.addEventListener("click", clickHandler, true);
-		container.appendChild(friendDiv);
-	});
-}
-
-// Utility: Get selected device from select element
-function getSelectedDevice(selectId, devices) {
-	const select = document.getElementById(selectId);
-	const deviceId = select.value;
-	return devices.find((d) => d.deviceId === deviceId) || null;
-}
-
-// Utility: Given a hex color string (e.g. "#123123"), return "#000000" or "#ffffff" for best contrast
-function getBestTextColor(hexColor) {
-	// Remove hash if present
-	const hex = hexColor.replace(/^#/, "");
-	// Parse r,g,b
-	let r, g, b;
-	if (hex.length === 3) {
-		r = parseInt(hex[0] + hex[0], 16);
-		g = parseInt(hex[1] + hex[1], 16);
-		b = parseInt(hex[2] + hex[2], 16);
-	} else if (hex.length === 6) {
-		r = parseInt(hex.substring(0, 2), 16);
-		g = parseInt(hex.substring(2, 4), 16);
-		b = parseInt(hex.substring(4, 6), 16);
-	} else {
-		// Invalid hex, default to black
-		return "#000000";
+// Utility class for helper functions
+class HarmonyUtils {
+	static removeClassFromAll(selector, className) {
+		document
+			.querySelectorAll(selector)
+			.forEach((el) => el.classList.remove(className));
 	}
-	// Calculate luminance
-	const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-	return luminance > 0.5 ? "#000000" : "#ffffff";
+
+	static removeAllChildren(parent, selector, exceptId) {
+		parent.querySelectorAll(selector).forEach((item) => {
+			if (!exceptId || item.id !== exceptId) item.remove();
+		});
+	}
+
+	static populateFriendsList(container, friends, clickHandler) {
+		friends.forEach((friend) => {
+			const friendDiv = document.createElement("div");
+			friendDiv.className = "friend-item";
+			friendDiv.setAttribute("name", DOMPurify.sanitize(friend.id));
+			friendDiv.textContent = DOMPurify.sanitize(
+				friend.nick ? `${friend.nick} (${friend.name})` : friend.name
+			);
+			friendDiv.addEventListener("click", FriendsManager.selectFriend, true);
+			container.appendChild(friendDiv);
+		});
+	}
+
+	static getSelectedDevice(selectId, devices) {
+		const select = document.getElementById(selectId);
+		const deviceId = select.value;
+		return devices.find((d) => d.deviceId === deviceId) || null;
+	}
+
+	static getBestTextColor(hexColor) {
+		const hex = hexColor.replace(/^#/, "");
+		let r, g, b;
+		if (hex.length === 3) {
+			r = parseInt(hex[0] + hex[0], 16);
+			g = parseInt(hex[1] + hex[1], 16);
+			b = parseInt(hex[2] + hex[2], 16);
+		} else if (hex.length === 6) {
+			r = parseInt(hex.substring(0, 2), 16);
+			g = parseInt(hex.substring(2, 4), 16);
+			b = parseInt(hex.substring(4, 6), 16);
+		} else {
+			return "#000000";
+		}
+		const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+		return luminance > 0.5 ? "#000000" : "#ffffff";
+	}
 }
 
 function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
@@ -1150,7 +1308,7 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 	if (/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color)) {
 		toast.className = "notification";
 		toast.style.backgroundColor = color;
-		toast.style.color = getBestTextColor(color);
+		toast.style.color = HarmonyUtils.getBestTextColor(color);
 	} else {
 		toast.className = `notification ${color}`;
 	}
@@ -1165,15 +1323,8 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 	toast.style.zIndex = 9999;
 	toast.style.minWidth = "20px";
 
-	toast.innerHTML = `
-		${DOMPurify.sanitize(
-			msg
-		)}<button class="toastClose ml-2 mr-1"><span class="icon is-small">
-      <i class="fas fa-xmark"></i>
-    </span></button>
-	`;
-	toast.querySelector(".toastClose").onclick = () => {
-		// Animate stow
+	// Helper function for closing and animating toast
+	function closeToast() {
 		toast.style.transform = "translate(-50%, -100%)";
 		toast.style.opacity = "0";
 		setTimeout(() => {
@@ -1187,6 +1338,17 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 				el.style.top = `calc(${baseTop}rem + ${idx * 3}rem)`;
 			});
 		}, 300);
+	}
+
+	toast.innerHTML = `
+		${DOMPurify.sanitize(
+			msg
+		)}<button class="toastClose ml-2 mr-1"><span class="icon is-small">
+      <i class="fas fa-xmark"></i>
+    </span></button>
+	`;
+	toast.querySelector(".toastClose").onclick = () => {
+		closeToast();
 	};
 
 	if (typeof onclick == "function") {
@@ -1195,6 +1357,7 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 			// Prevent click on close button from triggering onclick
 			if (e.target.closest(".toastClose")) return;
 			onclick(e);
+			closeToast();
 		});
 	}
 	// Instead of document.body, append to #chat
@@ -1218,19 +1381,159 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 	toastStackHeight++;
 
 	setTimeout(() => {
-		// Animate stow
-		toast.style.transform = "translate(-50%, -100%)";
-		toast.style.opacity = "0";
-		setTimeout(() => {
-			toast.remove();
-			toastStackHeight = Math.max(0, toastStackHeight - 1);
-			// Re-stack remaining toasts
-			document.querySelectorAll(".notification").forEach((el, idx) => {
-				// Animate top property for smooth re-stack
-				el.style.transition =
-					"top 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s";
-				el.style.top = `calc(${baseTop}rem + ${idx * 3}rem)`;
-			});
-		}, 300);
+		//check if toast already gone
+		if (!toast || toast.style.opacity == 0) {
+			return;
+		}
+		closeToast();
 	}, timeout);
+}
+
+// FriendsManager class for all friends-related logic
+class FriendsManager {
+	static selectFriend(e) {
+		let el = e.target || e;
+		if (
+			el.id == "friends-header" ||
+			el.classList.contains("friends-menu-item") ||
+			el.classList.contains("no-fire")
+		) {
+			return;
+		}
+		//stop icons from tweaking out
+		if (el.tagName.toLowerCase() != "div") {
+			if (el.parentElement) {
+				el.parentElement.dispatchEvent(new Event("click", { bubbles: true }));
+			}
+			return;
+		}
+		// Remove 'selected' class from all friend items except the clicked one
+		document.querySelectorAll(".friend-item.selected").forEach((item) => {
+			if (item !== el) {
+				item.classList.remove("selected");
+			}
+		});
+		// Add 'selected' class to the clicked friend item
+		el.classList.add("selected");
+		selectedFriend = el.getAttribute("name");
+		let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
+		if (privFriend && privFriend.chat) {
+			displayChat(privFriend.chat);
+		} else {
+			console.log("Error finding friend chat for ", selectedFriend);
+		}
+	}
+
+	static showFriendRequests() {
+		HarmonyUtils.removeClassFromAll(".friends-menu-item > i", "active");
+		document.getElementById("friendRequestsViewBtn").classList.add("active");
+		const friendsContainer = document.getElementById("friends");
+		HarmonyUtils.removeAllChildren(
+			friendsContainer,
+			".friend-item",
+			"friends-header"
+		);
+		HarmonyUtils.removeAllChildren(friendsContainer, ".friend-request-item");
+
+		const requests = Array.isArray(friendReqs.incoming)
+			? friendReqs.incoming
+			: [];
+		if (requests.length === 0) {
+			const noReq = document.createElement("div");
+			noReq.className = "friend-request-item";
+			noReq.textContent = "No pending friend requests.";
+			friendsContainer.appendChild(noReq);
+		}
+
+		requests.forEach((req) => {
+			if (req.from == selfId) return;
+			const reqDiv = document.createElement("div");
+			reqDiv.className = "friend-request-item";
+			reqDiv.innerHTML = `
+				<span>${DOMPurify.sanitize(req.fromName || req.from)}</span>
+				<span>
+				<span class="icon mx-1"><i class="accept-friend-request fas fa-xl fa-check-circle"></i></span>
+				<span class="icon ml-1"><i class="reject-friend-request fas fa-xl fa-circle-xmark"></i></span>
+				</span>
+			`;
+			reqDiv.setAttribute("reqFrom", DOMPurify.sanitize(req.from));
+			reqDiv.querySelector(".accept-friend-request").onclick = () => {
+				req.status = "accepted";
+				socket.emit("friendRequestResponse", req);
+				reqDiv.remove();
+				friendReqs.incoming = friendReqs.incoming.filter(
+					(r) => r.id !== req.id
+				);
+				//add friend to local prefs
+				localPrefs.friends.push({
+					name: req.fromName,
+					id: req.from,
+					chat: req.chat,
+				});
+				window.electronAPI.updatePrefs(localPrefs);
+				showToast(`${DOMPurify(req.fromName)} Is Now Your Friend!`);
+			};
+			reqDiv.querySelector(".reject-friend-request").onclick = () => {
+				req.status = "rejected";
+				socket.emit("friendRequestResponse", req);
+				reqDiv.remove();
+				friendReqs.incoming = friendReqs.incoming.filter(
+					(r) => r.id !== req.id
+				);
+				showToast(`Removed Friend Request`);
+			};
+			friendsContainer.appendChild(reqDiv);
+		});
+
+		const outgoingReqs = Array.isArray(friendReqs.outgoing)
+			? friendReqs.outgoing
+			: [];
+		if (outgoingReqs.length > 0) {
+			const outgoingDiv = document.createElement("div");
+			outgoingDiv.className =
+				"friend-request-item has-background-grey-dark has-text-white";
+			outgoingDiv.textContent = "Outgoing Friend Requests";
+			friendsContainer.appendChild(outgoingDiv);
+		}
+
+		outgoingReqs.forEach((req) => {
+			const reqDiv = document.createElement("div");
+			reqDiv.className = "friend-request-item";
+			reqDiv.innerHTML = `
+				<span>${DOMPurify.sanitize(req.toName || req.to)}</span>
+				<span class="icon mx-1"><i class="reject-friend-request fas fa-xl fa-circle-xmark"></i></span>
+			`;
+			reqDiv.setAttribute("reqTo", DOMPurify.sanitize(req.to));
+			reqDiv.querySelector(".reject-friend-request").onclick = () => {
+				socket.emit("cancelFriendRequest", req);
+				reqDiv.remove();
+				friendReqs.outgoing = friendReqs.outgoing.filter(
+					(r) => r.to !== req.to
+				);
+				showToast(`Cancelled Friend Request`);
+			};
+			friendsContainer.appendChild(reqDiv);
+		});
+	}
+
+	static showFriends(e) {
+		HarmonyUtils.removeClassFromAll(".friends-menu-item > i", "active");
+		document.getElementById("friendsViewBtn").classList.add("active");
+
+		const friendsContainer = document.getElementById("friends");
+		HarmonyUtils.removeAllChildren(friendsContainer, ".friend-request-item");
+		HarmonyUtils.removeAllChildren(
+			friendsContainer,
+			".friend-item",
+			"friends-header"
+		);
+
+		if (localPrefs && Array.isArray(localPrefs.friends)) {
+			HarmonyUtils.populateFriendsList(
+				friendsContainer,
+				localPrefs.friends,
+				FriendsManager.selectFriend
+			);
+		}
+	}
 }

@@ -2,7 +2,7 @@
   "user": {
     "username": "Quantum Owl",
     "userId": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
-    "password": ""
+    "password": "12345678"
   },
   "servers": [
     {
@@ -44,13 +44,19 @@
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#3bdbcd",
+    "accentColor": "#dbdbcd",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true,
     "maxMsgHistory": 50
   },
-  "friends": [],
+  "friends": [
+    {
+      "name": "Fluffy Ghost",
+      "id": "f842a398-9470-4644-8165-64aad570267f",
+      "chat": "89210a67be76b11d3329c1796fbc00607c15fbc36a5bca9c"
+    }
+  ],
   "devices": {
     "videoInputDevices": [],
     "audioInputDevices": [
@@ -92,16 +98,13 @@
         "label": "Mac mini Speakers (Built-in)"
       }
     ],
-    "audioInputDevice": {
-      "deviceId": "default",
-      "kind": "audioinput",
-      "label": "Default - Myle pods (Bluetooth)"
-    },
+    "audioInputDevice": null,
     "audioOutputDevice": {
       "deviceId": "default",
       "kind": "audiooutput",
       "label": "Default - Myle pods (Bluetooth)"
-    }
+    },
+    "videoInputDevice": null
   },
   "audio": {
     "inputGain": 1,

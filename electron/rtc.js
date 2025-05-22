@@ -29,7 +29,7 @@ class rtcInterface {
 			this.socket = window.socket;
 		}
 		this.socket.on("welcome", (data) => {
-			//ran after we join a new channel
+			//ran after we join a new channel or rejoin one
 			console.log("Welcome: ", data);
 
 			if (this.signalingChannel != data.channel) {
@@ -232,6 +232,7 @@ class rtcInterface {
 		} else {
 			console.warn("attempted to hang up vc with no set mediaChannel");
 		}
+		//remove all remoteaudio streams
 		Object.keys(this.peerConnections).forEach((peerId) => {
 			if (this.remoteAudioStreams[peerId]) {
 				this.remoteAudioStreams[peerId].getTracks().forEach((track) => {
@@ -262,7 +263,27 @@ class rtcInterface {
 		};
 		console.log(`Sending voiceLeave on ${this.mediaChannel}`);
 		this.sendMessage(msg, setChannelType(this.mediaChannel, "chat"));
-
+		//check if currentChat != our chat converted mediachannel (viewing diff channel then on vc with)
+		if (currentChat != setChannelType(this.mediaChannel, "chat")) {
+			//if so we should clear vc and see if anyone is in the currentchats vc
+			// Clear all .voice-prof elements in #voice-list
+			const voiceList = document.getElementById("voice-list");
+			if (voiceList) {
+				voiceList.querySelectorAll(".voice-prof").forEach((el) => el.remove());
+			}
+			socket.emit(
+				"channelQuery",
+				setChannelType(currentChat, "voice"),
+				(res) => {
+					//check if anyone is in new channels vc
+					console.log(res);
+					if (res.length > 0) {
+						//for each peer in res, add to vc ui
+						
+					}
+				}
+			);
+		}
 		this.mediaChannel = null;
 	}
 
@@ -387,7 +408,7 @@ class rtcInterface {
 			const server = localPrefs.servers.find(
 				(s) => s.secret === msg.channel.split(":")[1]
 			);
-			const user = userLookup(msg.from);
+			const user = userLookup(msg.user);
 			if (server) {
 				showToast(
 					`${user.nick ? user.nick : user.name} calling on ${server.name}`
@@ -411,7 +432,7 @@ class rtcInterface {
 		const server = localPrefs.servers.find(
 			(s) => s.id === msg.channel.split(":")[1]
 		);
-		const user = userLookup(msg.from);
+		const user = userLookup(msg.user);
 		if (server) {
 			showToast(
 				`${user.nick ? user.nick : user.name} calling on ${server.name}`

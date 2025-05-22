@@ -6,7 +6,7 @@ import cors from "cors";
 import sirv from "sirv";
 import { JSONFilePreset } from "lowdb/node";
 import crypto from "crypto";
-
+import { instrument } from "@socket.io/admin-ui";
 // ENVIRONMENT VARIABLES
 const PORT = process.env.PORT || 3000;
 
@@ -14,7 +14,16 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(express.json(), cors());
 const server = http.createServer(app);
-const io = new socketio(server, { cors: {} });
+const io = new socketio(server, {
+	cors: {
+		origin: ["https://admin.socket.io"],
+		credentials: true,
+	},
+});
+instrument(io, {
+	auth: false,
+	mode: "development",
+});
 
 // DB
 const db = await JSONFilePreset("db.json", {
@@ -185,6 +194,17 @@ io.on("connection", (socket) => {
 			channel: chnl,
 			target: chnl,
 		});
+	});
+
+	socket.on("channelQuery", (chnl, callback) => {
+		//get all peers on this voice channel and pass to callback
+		//TODO this should probably have some throttle
+		const clients = io.sockets.adapter.rooms.get(chnl);
+		if (!clients) {
+			callback([]);
+		} else {
+			callback(clients);
+		}
 	});
 
 	socket.on("leaveChannel", (chnl) => {
@@ -378,6 +398,8 @@ io.on("connection", (socket) => {
 		} else {
 		}
 	});
+
+	socket.on("friendRemove", async (callback) => {});
 
 	socket.on("checkFriendReqs", async (callback) => {
 		const userId = socket.handshake.auth.userId;
@@ -578,7 +600,7 @@ app.use(sirv("public"));
 // RUN APP
 server.listen(PORT, console.log(`Listening on PORT ${PORT}`));
 
-//util for fake server id
+//util for fake server id to avoid exposing unlisted servers when running exact server query
 function generateUuidBySeed(seedString) {
 	//add per server session salt to hash to stop guessing of fake uuids
 	seedString = `${seedString}${pepper}`;

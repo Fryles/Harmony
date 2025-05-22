@@ -9,6 +9,32 @@ html {
 	font-style: normal;
 	user-select: none;
 }
+/* scrollbar styling */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+	background: transparent; /* Hide track */
+}
+::-webkit-scrollbar-thumb {
+	background: var(--bulma-grey-dark);
+	border-radius: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent; /* Hide track */
+}
+::-webkit-scrollbar-button {
+	display: none; /* Hide buttons */
+}
+::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+/* For Firefox */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--bulma-grey-dark) transparent;
+}
 
 .left-bar {
 	width: 70px;
