@@ -4,14 +4,14 @@
     "f842a398-9470-4644-8165-64aad570267f": {
       "name": "Fluffy Ghost",
       "secret": "b2fe6cd46334bdada6e231e3db867463bd8e79f5ffb9b3f0fb0a0961f4d2ad57",
-      "session": "110ad64a4dddd6541f9edfb7ebabee76",
-      "sessionTimestamp": 1747944482275
+      "session": "8a752c4db3eb0c461d6b1306029a6fc3",
+      "sessionTimestamp": 1748032248243
     },
     "a268f8bb-a15a-48cc-90fd-f92642f41b95": {
       "name": "Quantum Owl",
       "secret": "17574bba78106ccd61732675d29252d4916ed9a2134fe01b2737cfadb55d4dc6",
-      "session": "d39b69291be9687a4fcb6faf1bf3ab62",
-      "sessionTimestamp": 1747942096042
+      "session": "f2401c3b9b57c0483b6efb6117b8e61d",
+      "sessionTimestamp": 1748033179371
     }
   },
   "ips": {},

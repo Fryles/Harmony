@@ -56,10 +56,7 @@ function loadFriends(prefs) {
 		let el = document.createElement("div");
 		el.classList.add("friend-item");
 		el.setAttribute("name", friend.id);
-		el.innerHTML =
-			friend.nick != "" && friend.nick != undefined
-				? `${friend.nick} (${friend.name})`
-				: friend.name;
+		el.innerHTML = friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name;
 		document.getElementById("friends").appendChild(el);
 	});
 }
@@ -94,8 +91,7 @@ function loadServers(prefs) {
 	});
 
 	//add add server button
-	let el =
-		"<div class='server-item' name='HARMONY-ADD-SERVER'><i class='fas fa-lg fa-plus-circle'></i></div>";
+	let el = "<div class='server-item' name='HARMONY-ADD-SERVER'><i class='fas fa-lg fa-plus-circle'></i></div>";
 	serverList.innerHTML += el;
 }
 
@@ -172,35 +168,21 @@ function loadSettings(prefs) {
 	document.getElementById("password").value = prefs.user.password;
 
 	// Devices - populate dropdowns
-	populateDeviceDropdown(
-		"videoInputDevice",
-		prefs.devices.videoInputDevices || [],
-		prefs.devices.videoInputDevice
-	);
-	populateDeviceDropdown(
-		"audioInputDevice",
-		prefs.devices.audioInputDevices || [],
-		prefs.devices.audioInputDevice
-	);
-	populateDeviceDropdown(
-		"audioOutputDevice",
-		prefs.devices.audioOutputDevices || [],
-		prefs.devices.audioOutputDevice
-	);
+	populateDeviceDropdown("videoInputDevice", prefs.devices.videoInputDevices || [], prefs.devices.videoInputDevice);
+	populateDeviceDropdown("audioInputDevice", prefs.devices.audioInputDevices || [], prefs.devices.audioInputDevice);
+	populateDeviceDropdown("audioOutputDevice", prefs.devices.audioOutputDevices || [], prefs.devices.audioOutputDevice);
 
 	// Audio
 	document.getElementById("inputGain").value = prefs.audio.inputGain;
 	document.getElementById("hotMicThresh").value = prefs.audio.hotMicThresh;
 	document.getElementById("outputVolume").value = prefs.audio.outputVolume;
 	document.getElementById("ringVolume").value = prefs.audio.ringVolume;
-	document.getElementById("enableNoiseSuppression").checked =
-		prefs.audio.enableNoiseSuppression;
+	document.getElementById("enableNoiseSuppression").checked = prefs.audio.enableNoiseSuppression;
 
 	// Settings
 	document.getElementById("accentColor").value = prefs.settings.accentColor;
 	document.getElementById("theme").value = prefs.settings.theme;
-	document.getElementById("notifications").checked =
-		prefs.settings.notifications;
+	document.getElementById("notifications").checked = prefs.settings.notifications;
 }
 
 async function autoUpdateDevices(prefs) {
@@ -214,15 +196,9 @@ async function autoUpdateDevices(prefs) {
 				label: device.label,
 			};
 		});
-		var videoInputDevices = devices.filter(
-			(device) => device.kind === "videoinput"
-		);
-		var audioInputDevices = devices.filter(
-			(device) => device.kind === "audioinput"
-		);
-		var audioOutputDevices = devices.filter(
-			(device) => device.kind === "audiooutput"
-		);
+		var videoInputDevices = devices.filter((device) => device.kind === "videoinput");
+		var audioInputDevices = devices.filter((device) => device.kind === "audioinput");
+		var audioOutputDevices = devices.filter((device) => device.kind === "audiooutput");
 
 		var videoInputDevice = videoInputDevices[0];
 		var audioInputDevice = audioInputDevices[0];
@@ -293,9 +269,7 @@ function populateDeviceDropdown(selectId, devices, selectedDevice) {
 		defaultOption.textContent = "Select device";
 	} else {
 		//filter devices out so we dont include this twice
-		devices = devices.filter(
-			(device) => device.deviceId != selectedDevice.deviceId
-		);
+		devices = devices.filter((device) => device.deviceId != selectedDevice.deviceId);
 		defaultOption.value = selectedDevice.deviceId;
 		defaultOption.textContent = selectedDevice.label;
 	}

@@ -8,6 +8,9 @@ html {
 	font-weight: 400;
 	font-style: normal;
 	user-select: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
 }
 /* scrollbar styling */
 ::-webkit-scrollbar {
@@ -72,7 +75,15 @@ html {
 	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
 	color: #fff;
 }
-
+.server-item.ringing {
+	animation: wiggle-ring 0.7s infinite;
+	box-shadow: 0 0 6px 4px rgba(55, 232, 55, 0.6);
+	border: var(--bulma-success) 2px solid;
+}
+.server-item.call {
+	box-shadow: 0 0 4px 2px rgba(55, 232, 55, 0.6);
+	border: var(--bulma-success) 2px solid;
+}
 .main-area {
 	flex: 1;
 	display: flex;
@@ -119,10 +130,10 @@ html {
 	border-radius: 25px;
 }
 .voice-area.ringing {
-	animation: pulse-incoming 1s infinite;
+	animation: pulse 1s infinite;
 	box-shadow: 0 0 0 0 rgba(50, 205, 50, 0.7);
 }
-@keyframes pulse-incoming {
+@keyframes pulse {
 	0% {
 		transform: scale(1);
 		box-shadow: 0 0 0 0 rgba(50, 205, 50, 0.7);
@@ -133,6 +144,17 @@ html {
 	}
 	100% {
 		transform: scale(1);
+		box-shadow: 0 0 0 0 rgba(50, 205, 50, 0);
+	}
+}
+@keyframes pulse-no-scale {
+	0% {
+		box-shadow: 0 0 0 0 rgba(50, 205, 50, 0.7);
+	}
+	70% {
+		box-shadow: 0 0 0 12px rgba(50, 205, 50, 0);
+	}
+	100% {
 		box-shadow: 0 0 0 0 rgba(50, 205, 50, 0);
 	}
 }
@@ -255,8 +277,7 @@ html {
 #friends {
 	height: 100vh;
 	border-right: var(--bulma-black-ter) 4px solid;
-	transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-		width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+	transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
 	will-change: transform, width, opacity;
 	width: calc-size(auto, size);
 	opacity: 1;
@@ -280,7 +301,16 @@ html {
 	align-items: center;
 	flex-direction: row;
 }
-
+.friend-item.call {
+	border: var(--bulma-success) 2px solid;
+	border-radius: 5px;
+	box-shadow: inset 0 0px 4px 3px rgba(55, 232, 55, 0.3);
+}
+.friend-item.ringing {
+	border: var(--bulma-success) 2px solid;
+	animation: pulse-no-scale 1s infinite;
+	border-radius: 5px;
+}
 .friend-item.selected > span {
 	color: var(--bulma-primary-light);
 }
@@ -288,7 +318,6 @@ html {
 	transform: scale(1.1);
 	color: #fff;
 }
-
 .friend-item > span {
 	transition: all 0.3s ease;
 	color: var(--bulma-grey-light);
@@ -441,6 +470,7 @@ div.modal-background {
 	border-start-end-radius: 10px;
 	border-start-start-radius: 10px;
 }
+
 .tabs.is-boxed a:hover {
 	background-color: #111111aa;
 }

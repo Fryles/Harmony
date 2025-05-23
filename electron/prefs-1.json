@@ -52,9 +52,11 @@
   },
   "friends": [
     {
-      "name": "Fluffy Ghost",
+      "name": "lower window",
       "id": "f842a398-9470-4644-8165-64aad570267f",
-      "chat": "89210a67be76b11d3329c1796fbc00607c15fbc36a5bca9c"
+      "chat": "89210a67be76b11d3329c1796fbc00607c15fbc36a5bca9c",
+      "volume": 1,
+      "nick": ""
     }
   ],
   "devices": {

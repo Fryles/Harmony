@@ -4,6 +4,7 @@ class rtcInterface {
 		//This is only changed for new connections
 		this.mediaChannel = null; //channel for video/voice
 		this.peerConnections = {};
+		this.peerChannels = {};
 		this.remoteAudioStreams = {};
 		this.remoteAudioGainNodes = {};
 		this.dataChannels = {};
@@ -52,17 +53,12 @@ class rtcInterface {
 					this.startChatConnection(peerId);
 				} else if (type == "video") {
 				} else {
-					console.warn(
-						"bad typed channel coming back from server... its confused."
-					);
+					console.warn("bad typed channel coming back from server... its confused.");
 				}
 				//add channel to peer
-				const pc = this.peerConnections[peerId];
-				if (pc) {
-					pc.channels = pc.channels || [];
-					if (!pc.channels.includes(data.channel)) {
-						pc.channels.push(data.channel);
-					}
+				this.peerChannels[peerId] = this.peerChannels[peerId] || [];
+				if (!this.peerChannels[peerId].includes(data.channel)) {
+					this.peerChannels[peerId].push(data.channel);
 				}
 			});
 		});
@@ -71,16 +67,14 @@ class rtcInterface {
 			const newPeer = data.from;
 			console.log(`${newPeer} joined channel ${data.channel}`);
 			//add channel to peer
-			const pc = this.peerConnections[newPeer];
-			if (pc) {
-				pc.channels = pc.channels || [];
-				if (!pc.channels.includes(data.channel)) {
-					pc.channels.push(data.channel);
-				}
+			this.peerChannels[newPeer] = this.peerChannels[newPeer] || [];
+			if (!this.peerChannels[newPeer].includes(data.channel)) {
+				this.peerChannels[newPeer].push(data.channel);
 			}
-			//if peer is joining on a voice channel, add to voice ui
+			//if peer is joining on a voice channel we are on, add to voice ui
 			const [type] = data.channel ? data.channel.split(":") : [null];
-			if (type === "voice") {
+			if (type === "voice" && this.mediaChannel == data.channel) {
+				const pc = this.peerConnections[newPeer];
 				if (this.ring) {
 					//joining during ring... stop ring
 					this.voiceRingEnd();
@@ -89,9 +83,7 @@ class rtcInterface {
 				if (this.localAudioStream) {
 					const senders = pc.getSenders();
 					this.localAudioStream.getTracks().forEach((track) => {
-						const alreadyAdded = senders.some(
-							(sender) => sender.track && sender.track.id === track.id
-						);
+						const alreadyAdded = senders.some((sender) => sender.track && sender.track.id === track.id);
 						if (!alreadyAdded) {
 							pc.addTrack(track, this.localAudioStream);
 							console.log("Added local track to peer connection");
@@ -109,35 +101,26 @@ class rtcInterface {
 
 			//remove channel from this peer
 			const peerId = data.peer;
-			if (this.peerConnections[peerId]) {
-				const pc = this.peerConnections[peerId];
-				if (pc.channels) {
-					pc.channels = pc.channels.filter((ch) => ch !== data.channel);
-				}
-				// // If no channels left (unlikely since chats always open)
-				// if (!pc.channels || pc.channels.length === 0) {
-				// 	if (pc.signalingState !== "closed") {
-				// 		pc.close();
-				// 	}
-				// 	delete this.peerConnections[peerId];
-				// }
+			if (this.peerChannels[peerId]) {
+				this.peerChannels[peerId] = this.peerChannels[peerId].filter((ch) => ch !== data.channel);
 			}
 			//if voice channel, remove from ui
 
 			const [type] = data.channel ? data.channel.split(":") : [null];
 			if (type === "voice") {
-				// Remove local audio tracks from the peer connection when leaving voice
-				const pc = this.peerConnections[data.from];
-				if (pc && this.localAudioStream) {
-					const localTrackIds = this.localAudioStream
-						.getTracks()
-						.map((t) => t.id);
-					pc.getSenders().forEach((sender) => {
-						if (sender.track && localTrackIds.includes(sender.track.id)) {
-							pc.removeTrack(sender);
-						}
-					});
+				if (this.mediaChannel == data.channel) {
+					// Remove local audio tracks from the peer connection when leaving voice we area on
+					const pc = this.peerConnections[data.from];
+					if (pc && this.localAudioStream) {
+						const localTrackIds = this.localAudioStream.getTracks().map((t) => t.id);
+						pc.getSenders().forEach((sender) => {
+							if (sender.track && localTrackIds.includes(sender.track.id)) {
+								pc.removeTrack(sender);
+							}
+						});
+					}
 				}
+				//remove from voice ui regardless of what vc were on
 				removeVoiceUser(data.from);
 			}
 		});
@@ -202,9 +185,7 @@ class rtcInterface {
 		e.classList.toggle("has-text-primary");
 		e.classList.toggle("has-text-danger");
 		if (window.rtc.localAudioStream) {
-			window.rtc._inputGainNode.gain.value = e.classList.contains(
-				"fa-microphone-slash"
-			)
+			window.rtc._inputGainNode.gain.value = e.classList.contains("fa-microphone-slash")
 				? 0
 				: window.rtc.inputGainValue;
 		}
@@ -248,11 +229,7 @@ class rtcInterface {
 			this.ring = null;
 		}
 		removeVoiceUser(selfId);
-		document.getElementById("voice-mute").classList.add("is-hidden");
-		document.getElementById("voice-call").classList.remove("pickup");
-		document.getElementById("voice-call").classList.remove("danger");
-		document.getElementById("voice-call").classList.add("has-text-primary");
-		document.getElementById("voice-call").classList.remove("has-text-danger");
+		setVoiceUIState("idle");
 		//send courtesy dataChannel message to remove yourself for any chat only peers
 		const msg = {
 			timestamp: Date.now(),
@@ -271,55 +248,52 @@ class rtcInterface {
 			if (voiceList) {
 				voiceList.querySelectorAll(".voice-prof").forEach((el) => el.remove());
 			}
-			socket.emit(
-				"channelQuery",
-				setChannelType(currentChat, "voice"),
-				(res) => {
-					//check if anyone is in new channels vc
-					console.log(res);
-					if (res.length > 0) {
-						//for each peer in res, add to vc ui
-						
-					}
+			socket.emit("channelQuery", setChannelType(currentChat, "voice"), (res) => {
+				//check if anyone is in new channels vc
+				console.log(res);
+				if (res.length > 0) {
+					//for each peer in res, add to vc ui
 				}
-			);
+			});
 		}
 		this.mediaChannel = null;
 	}
 
-	voiceRingEnd(toRemove) {
-		//param is optional to remove all users from ui
+	voiceRingEnd() {
+		if (!this.mediaChannel) {
+			//if not in channel, go back to idle
+			setVoiceUIState("idle");
+		} else {
+			//move state to in inCall
+			setVoiceUIState("inCall", this.ring.channel.split(":")[1]);
+		}
 		if (this.ring) {
 			this.ring.audio.pause();
 			this.ring.audio.currentTime = 0;
 			this.ring.audio = null;
 			clearTimeout(this.ring.timeout);
+			if (this.ring.type == "incoming voice" && setChannelType(currentChat, "voice") != this.ring.channel) {
+				//ring to us is ending and we are not in the channel it was on
+				removeVoiceUser(this.ring.from);
+			}
 			this.ring = null;
 		}
-		if (toRemove) {
-			removeVoiceUser(toRemove);
-		}
-		document.getElementById("voice-call").classList.remove("pickup");
-		document.getElementById("voice-list").classList.remove("ringing");
-		document.getElementById("voice-call").classList.remove("ringing");
 	}
 
 	async voiceJoin(channel) {
 		if (!this.localAudioStream) {
 			await this._initLocalAudio();
+			if (!this.localAudioStream) {
+				console.warn("failed to start local audio");
+				return;
+			}
 		}
 		if (this.ring && this.ring.type == "incoming voice") {
 			//stop any existing incoming ring
 			this.voiceRingEnd();
 		}
 		//change color of call button and stop anims
-		document.getElementById("voice-mute").classList.remove("is-hidden");
-		document.getElementById("voice-list").classList.remove("ringing");
-		document.getElementById("voice-call").classList.remove("ringing");
-		document.getElementById("voice-call").classList.remove("pickup");
-		document.getElementById("voice-call").classList.remove("has-text-primary");
-		document.getElementById("voice-call").classList.add("has-text-danger");
-		document.getElementById("voice-call").classList.add("danger");
+		setVoiceUIState("inCall", channel.split(":")[1]);
 		//add ourselves to ui
 		addVoiceUser(selfId);
 		this.joinChannel(channel);
@@ -338,9 +312,7 @@ class rtcInterface {
 		//Use established chat: channel passed to send a vc request
 		if (this.mediaChannel != channel) {
 			//ringing on a channel that were not in SHOULD NOT HAPPEN
-			console.error(
-				"Attempted to ring on channel we are not in. Was preRing called?"
-			);
+			console.error("Attempted to ring on channel we are not in. Was preRing called?");
 			return;
 		}
 		if (this.ring) {
@@ -368,15 +340,10 @@ class rtcInterface {
 			channel: channel,
 		};
 		this.ring.audio.loop = true;
-		this.ring.audio.volume = localPrefs.audio.ringVolume
-			? localPrefs.audio.ringVolume
-			: 0.7;
+		this.ring.audio.volume = localPrefs.audio.ringVolume ? localPrefs.audio.ringVolume : 0.7;
 		this.ring.audio.play();
 		//add ourselves to the ui and play anims
-		document.getElementById("voice-mute").classList.remove("is-hidden");
-		document.getElementById("voice-call").classList.remove("pickup");
-		document.getElementById("voice-list").classList.add("ringing");
-		document.getElementById("voice-call").classList.add("ringing");
+		setVoiceUIState("ringing");
 		//set timeout for ring end
 		this.ring.timeout = setTimeout(() => {
 			if (this.ring) {
@@ -399,46 +366,68 @@ class rtcInterface {
 			from: msg.user,
 			channel: setChannelType(msg.channel, "voice"),
 		};
-		if (this.mediaChannel && this.mediaChannel == msg.channel) {
+		if (this.mediaChannel && this.mediaChannel == this.ring.channel) {
 			//already in the call that is being rung... race cond maybe?
 			this.voiceJoin(this.mediaChannel);
 			return;
 		} else if (this.mediaChannel) {
-			// --- Show toast with server or user name ---
-			const server = localPrefs.servers.find(
-				(s) => s.secret === msg.channel.split(":")[1]
-			);
+			//ALREADY IN VC
+			const server = localPrefs.servers.find((s) => s.secret === msg.channel.split(":")[1]);
 			const user = userLookup(msg.user);
+
 			if (server) {
-				showToast(
-					`${user.nick ? user.nick : user.name} calling on ${server.name}`
-				);
+				showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
+					this.VoiceHangup();
+					const serverElem = document.querySelector(`.server-item[name="${server.id}"]`);
+					if (serverElem) {
+						selectServerItem(serverElem);
+					} else {
+						console.error("Could not find server that user is being called on", server);
+					}
+					this.voiceJoin(this.ring.channel);
+				});
 			} else {
-				showToast(`Incoming call from ${user.nick ? user.nick : user.name}`);
+				showToast(`Incoming call from ${user.nick ? user.nick : user.name}`, () => {
+					this.VoiceHangup();
+					const friendElem = document.querySelector(`.friend-item[name="${msg.user}"]`);
+					if (friendElem) {
+						FriendsManager.selectFriend(friendElem);
+					} else {
+						console.error("Could not find friend that is calling user", msg.user);
+					}
+					this.voiceJoin(this.ring.channel);
+				});
 			}
 			return;
-			//already in a vc
 		}
 		this.ring.audio.loop = true;
-		this.ring.audio.volume = localPrefs.audio.ringVolume
-			? localPrefs.audio.ringVolume
-			: 0.7;
+		this.ring.audio.volume = localPrefs.audio.ringVolume ? localPrefs.audio.ringVolume : 0.7;
 		this.ring.audio.play();
 		//add our caller to the ui and play anims
-		document.getElementById("voice-list").classList.add("ringing");
-		document.getElementById("voice-call").classList.add("ringing");
-		document.getElementById("voice-call").classList.add("pickup");
+		setVoiceUIState("ringing");
 		addVoiceUser(msg.user);
-		const server = localPrefs.servers.find(
-			(s) => s.id === msg.channel.split(":")[1]
-		);
+		const server = localPrefs.servers.find((s) => s.id === msg.channel.split(":")[1]);
 		const user = userLookup(msg.user);
 		if (server) {
-			showToast(
-				`${user.nick ? user.nick : user.name} calling on ${server.name}`
-			);
+			showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
+				const serverElem = document.querySelector(`.server-item[name="${server.id}"]`);
+				if (serverElem) {
+					selectServerItem(serverElem);
+				} else {
+					console.error("Could not find server that user is being called on", server);
+				}
+				this.voiceJoin(this.ring.channel);
+			});
 		} else {
-			showToast(`Incoming call from ${user.nick ? user.nick : user.name}`);
+			showToast(`Incoming call from ${user.nick ? user.nick : user.name}`, () => {
+				const friendElem = document.querySelector(`.friend-item[name="${msg.user}"]`);
+				if (friendElem) {
+					FriendsManager.selectFriend(friendElem);
+				} else {
+					console.error("Could not find friend that is calling user", msg.user);
+				}
+				this.voiceJoin(this.ring.channel);
+			});
 		}
 		//set timeout for ring end
 		this.ring.timeout = setTimeout(() => {
@@ -450,33 +439,21 @@ class rtcInterface {
 
 	joinChannel(newChannel) {
 		// Validate newChannel (format: type:base)
-		if (
-			newChannel === null ||
-			newChannel === undefined ||
-			typeof newChannel !== "string"
-		) {
+		if (newChannel === null || newChannel === undefined || typeof newChannel !== "string") {
 			console.error("bad channel");
 			console.error("Channel must be a string");
 			return;
 		}
 		const [type, base] = newChannel.split(":");
 		if (!type || !base || base.length === 0) {
-			console.error(
-				"Invalid channel format. Must be type:base with non-empty base.",
-				newChannel
-			);
+			console.error("Invalid channel format. Must be type:base with non-empty base.", newChannel);
 			return;
 		}
 		if (type !== "chat" && type !== "voice" && type !== "video") {
-			console.error(
-				`Client attempted to join channel ${newChannel} with invalid type ${type}`
-			);
+			console.error(`Client attempted to join channel ${newChannel} with invalid type ${type}`);
 			return;
 		}
-		if (
-			newChannel == this.mediaChannel ||
-			newChannel == this.signalingChannel
-		) {
+		if (newChannel == this.mediaChannel) {
 			//joining same channel, do nothing.
 			console.warn("attempted to join channel again");
 			return;
@@ -502,7 +479,7 @@ class rtcInterface {
 			this.localAudioStream = null;
 		}
 		this.socket.emit("leaveChannel", channel);
-		console.log("left ", this.signalingChannel);
+		console.log("broadcast leaveChannel on ", channel);
 	}
 
 	startVoiceConnection(peerId) {
@@ -511,10 +488,9 @@ class rtcInterface {
 			console.error("No existing peer connection to start voice from...");
 			return;
 		}
-		// Add channels property as an array to track channel membership
-		pc.channels = pc.channels || [];
-		if (!pc.channels.includes(this.signalingChannel)) {
-			pc.channels.push(this.signalingChannel);
+		this.peerChannels[peerId] = this.peerChannels[peerId] || [];
+		if (!this.peerChannels[peerId].includes(this.signalingChannel)) {
+			this.peerChannels[peerId].push(this.signalingChannel);
 		}
 		// If we already have a remote audio stream for this peer, don't add again
 		if (this.remoteAudioStreams[peerId]) {
@@ -525,9 +501,7 @@ class rtcInterface {
 		if (this.localAudioStream) {
 			const senders = pc.getSenders();
 			this.localAudioStream.getTracks().forEach((track) => {
-				const alreadyAdded = senders.some(
-					(sender) => sender.track && sender.track.id === track.id
-				);
+				const alreadyAdded = senders.some((sender) => sender.track && sender.track.id === track.id);
 				if (!alreadyAdded) {
 					pc.addTrack(track, this.localAudioStream);
 					console.log("Added local track to peer connection");
@@ -564,13 +538,10 @@ class rtcInterface {
 			return;
 		}
 
-		const pc = this.peerConnections[peerId]
-			? this.peerConnections[peerId]
-			: new RTCPeerConnection(this.rtcConfig);
-		// Add channels property as an array to track channel membership
-		pc.channels = pc.channels || [];
-		if (!pc.channels.includes(this.signalingChannel)) {
-			pc.channels.push(this.signalingChannel);
+		const pc = this.peerConnections[peerId] ? this.peerConnections[peerId] : new RTCPeerConnection(this.rtcConfig);
+		this.peerChannels[peerId] = this.peerChannels[peerId] || [];
+		if (!this.peerChannels[peerId].includes(this.signalingChannel)) {
+			this.peerChannels[peerId].push(this.signalingChannel);
 		}
 
 		if (!this.peerConnections[peerId]) {
@@ -604,11 +575,7 @@ class rtcInterface {
 	sendMessage(msg, channel) {
 		//send message to peers in specified channel
 		Object.keys(this.peerConnections).forEach((peerId) => {
-			if (
-				peerId !== selfId &&
-				this.peerConnections[peerId].channels &&
-				this.peerConnections[peerId].channels.includes(channel)
-			) {
+			if (peerId !== selfId && this.peerChannels[peerId] && this.peerChannels[peerId].includes(channel)) {
 				const dc = this.dataChannels[peerId];
 				if (dc && dc.readyState === "open") {
 					dc.send(JSON.stringify(msg));
@@ -627,18 +594,8 @@ class rtcInterface {
 		};
 		dc.onclose = () => {
 			console.log(`Data channel: ${dcChannel} closed with ${peerId}`);
-			if (this.peerConnections[peerId]) {
-				const pc = this.peerConnections[peerId];
-				if (pc.channels) {
-					pc.channels = pc.channels.filter((ch) => ch !== dcChannel);
-				}
-				// If no channels left, close and remove the peer connection
-				// if (!pc.channels || pc.channels.length === 0) {
-				// 	if (pc.signalingState !== "closed") {
-				// 		pc.close();
-				// 	}
-				// 	delete this.peerConnections[peerId];
-				// }
+			if (this.peerChannels[peerId]) {
+				this.peerChannels[peerId] = this.peerChannels[peerId].filter((ch) => ch !== dcChannel);
 			}
 			if (this.dataChannels[peerId]) {
 				delete this.dataChannels[peerId];
@@ -647,10 +604,7 @@ class rtcInterface {
 		dc.onmessage = (event) => {
 			event = JSON.parse(event.data);
 			//bad overhead using parse for a log
-			console.log(
-				`Received message from ${peerId} on channel ${event.channel}:`,
-				event.content
-			);
+			console.log(`Received message from ${peerId} on channel ${event.channel}:`, event.content);
 			switch (event.type) {
 				case "voiceRing":
 					this.gotRing(event);
@@ -662,9 +616,8 @@ class rtcInterface {
 					} else {
 						//remove from ui & channel
 						removeVoiceUser(event.user);
-						const pc = this.peerConnections[event.user];
-						if (pc.channels) {
-							pc.channels = pc.channels.filter((ch) => ch !== event.channel);
+						if (this.peerChannels[peerId]) {
+							this.peerChannels[peerId] = this.peerChannels[peerId].filter((ch) => ch !== event.channel);
 						}
 					}
 				case "videoRing":
@@ -686,13 +639,10 @@ class rtcInterface {
 	}
 
 	handleOffer(peerId, offer) {
-		const pc = this.peerConnections[peerId]
-			? this.peerConnections[peerId]
-			: new RTCPeerConnection(this.rtcConfig);
-		// Add channels property as an array to track channel membership
-		pc.channels = pc.channels || [];
-		if (!pc.channels.includes(this.signalingChannel)) {
-			pc.channels.push(this.signalingChannel);
+		const pc = this.peerConnections[peerId] ? this.peerConnections[peerId] : new RTCPeerConnection(this.rtcConfig);
+		this.peerChannels[peerId] = this.peerChannels[peerId] || [];
+		if (!this.peerChannels[peerId].includes(this.signalingChannel)) {
+			this.peerChannels[peerId].push(this.signalingChannel);
 		}
 		if (!this.peerConnections[peerId]) {
 			this.peerConnections[peerId] = pc;
@@ -703,9 +653,7 @@ class rtcInterface {
 			if (this.localAudioStream) {
 				const senders = pc.getSenders();
 				this.localAudioStream.getTracks().forEach((track) => {
-					const alreadyAdded = senders.some(
-						(sender) => sender.track && sender.track.id === track.id
-					);
+					const alreadyAdded = senders.some((sender) => sender.track && sender.track.id === track.id);
 					if (!alreadyAdded) {
 						pc.addTrack(track, this.localAudioStream);
 						console.log("Added local track to peer connection");
@@ -752,9 +700,7 @@ class rtcInterface {
 					});
 				});
 		} else {
-			console.warn(
-				`handleOffer: Skipping setRemoteDescription due to signalingState=${pc.signalingState}`
-			);
+			console.warn(`handleOffer: Skipping setRemoteDescription due to signalingState=${pc.signalingState}`);
 		}
 	}
 
@@ -762,15 +708,10 @@ class rtcInterface {
 		const pc = this.peerConnections[peerId];
 		if (pc) {
 			// --- Add state check before setRemoteDescription ---
-			if (
-				pc.signalingState === "have-local-offer" ||
-				pc.signalingState === "have-remote-offer"
-			) {
+			if (pc.signalingState === "have-local-offer" || pc.signalingState === "have-remote-offer") {
 				pc.setRemoteDescription(new RTCSessionDescription(answer));
 			} else {
-				console.warn(
-					`handleAnswer: Skipping setRemoteDescription due to signalingState=${pc.signalingState}`
-				);
+				console.warn(`handleAnswer: Skipping setRemoteDescription due to signalingState=${pc.signalingState}`);
 			}
 		}
 	}
@@ -795,8 +736,7 @@ class rtcInterface {
 		let stream = trackEvent.streams[0];
 		// --- Add controllable GainNode for remote audio ---
 		if (!this._audioContext) {
-			this._audioContext = new (window.AudioContext ||
-				window.webkitAudioContext)();
+			this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
 		}
 		// Disconnect previous gain node if exists
 		if (this.remoteAudioGainNodes[peerId]) {
@@ -807,10 +747,7 @@ class rtcInterface {
 		const remoteGainNode = this._audioContext.createGain();
 		// Set gain to friend volume or 1
 		const friendPref = localPrefs.friends.filter((f) => f.id == peerId)[0];
-		remoteGainNode.gain.value =
-			friendPref && typeof friendPref.volume === "number"
-				? friendPref.volume
-				: 1;
+		remoteGainNode.gain.value = friendPref && typeof friendPref.volume === "number" ? friendPref.volume : 1;
 
 		const remoteDestination = this._audioContext.createMediaStreamDestination();
 		remoteSource.connect(remoteGainNode);
@@ -858,27 +795,21 @@ class rtcInterface {
 				audio: deviceId ? { deviceId: { exact: deviceId } } : true,
 				video: false,
 			};
-			this.localAudioStream = await navigator.mediaDevices.getUserMedia(
-				constraints
-			);
+			this.localAudioStream = await navigator.mediaDevices.getUserMedia(constraints);
 			this.unProcessedLocalAudio = this.localAudioStream;
 
 			// Add input gain control
 			if (!this._audioContext) {
-				this._audioContext = new (window.AudioContext ||
-					window.webkitAudioContext)();
+				this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
 			}
-			const source = this._audioContext.createMediaStreamSource(
-				this.localAudioStream
-			);
+			const source = this._audioContext.createMediaStreamSource(this.localAudioStream);
 
 			this._inputGainNode = this._audioContext.createGain();
 			this._inputGainNode.gain.value = this.inputGainValue;
 			source.connect(this._inputGainNode);
 
 			// Create a destination node and connect gain node to it
-			this._inputDestination =
-				this._audioContext.createMediaStreamDestination();
+			this._inputDestination = this._audioContext.createMediaStreamDestination();
 			this._inputGainNode.connect(this._inputDestination);
 
 			// Replace localAudioStream with the processed stream
@@ -895,10 +826,7 @@ class rtcInterface {
 				if (amp < this.hotMicThresh) {
 					this._inputGainNode.gain.value = 0;
 				} else if (
-					!document
-						.getElementById("voice-mute")
-						.querySelector("i")
-						.classList.contains("fa-microphone-slash")
+					!document.getElementById("voice-mute").querySelector("i").classList.contains("fa-microphone-slash")
 				) {
 					this._inputGainNode.gain.value = this.inputGainValue;
 				}
@@ -912,11 +840,94 @@ class rtcInterface {
 	}
 }
 
+// Utility function to set UI state for voice call controls
+function setVoiceUIState(state, id = "") {
+	const mute = document.getElementById("voice-mute");
+	const vcEl = document.getElementById("voice-call");
+	const list = document.getElementById("voice-list");
+	const friends = document.querySelectorAll(".friend-item:not(#friends-header)");
+	const servers = document.querySelectorAll(".server-item");
+	if (!mute || !vcEl || !list || !servers || !friends) return;
+
+	// Reset all relevant classes
+	mute.classList.add("is-hidden");
+	vcEl.classList.remove("ringing", "pickup", "has-text-primary", "has-text-danger", "danger");
+	list.classList.remove("ringing");
+
+	switch (state) {
+		case "ringing":
+			mute.classList.remove("is-hidden");
+			vcEl.classList.add("ringing", "pickup");
+			list.classList.add("ringing");
+			if (id) {
+				const elem = document.querySelector(`[name="${id}"]`);
+				if (elem) {
+					if (elem.classList.contains("server-item")) {
+						// Server ringing
+						servers.forEach((s) => {
+							if (s.getAttribute("name") == id) {
+								s.classList.add("ringing");
+							} else {
+								s.classList.remove("ringing");
+							}
+						});
+					} else if (elem.classList.contains("friend-item")) {
+						// Friend ringing
+						document.querySelector(`.server-item[name="HARMONY-FRIENDS-LIST"]`).classList.add("ringing");
+						friends.forEach((f) => {
+							if (f.getAttribute("name") == id) {
+								f.classList.add("ringing");
+							} else {
+								f.classList.remove("ringing");
+							}
+						});
+					}
+				}
+			}
+			break;
+		case "inCall":
+			mute.classList.remove("is-hidden");
+			vcEl.classList.remove("pickup", "ringing", "has-text-primary");
+			vcEl.classList.add("has-text-danger", "danger");
+			list.classList.remove("ringing");
+			friends.forEach((f) => {
+				f.classList.remove("ringing");
+				f.classList.remove("call");
+			});
+			servers.forEach((s) => {
+				s.classList.remove("ringing");
+				s.classList.remove("call");
+			});
+			let call = document.querySelector(`[name="${id}"]`);
+			if (call) {
+				vcEl.classList.add("call");
+			}
+			if (vcEl.classList.contains("friend-item")) {
+				//if were on call w/friend highlight friend server icon
+				document.querySelector(`.server-item[name="HARMONY-FRIENDS-LIST"]`).classList.add("call");
+			}
+			break;
+		case "idle":
+		default:
+			mute.classList.add("is-hidden");
+			vcEl.classList.remove("pickup", "danger", "has-text-danger", "ringing");
+			vcEl.classList.add("has-text-primary");
+			list.classList.remove("ringing");
+			friends.forEach((f) => {
+				f.classList.remove("ringing");
+				f.classList.remove("call");
+			});
+			servers.forEach((s) => {
+				s.classList.remove("ringing");
+				s.classList.remove("call");
+			});
+			break;
+	}
+}
+
 function setChannelType(channel, type) {
 	if (type != "chat" && type != "voice" && type != "video") {
-		console.error(
-			`Attempted to set channel ${channel} with invalid type ${type}`
-		);
+		console.error(`Attempted to set channel ${channel} with invalid type ${type}`);
 	}
 	let base = channel.split(":")[1];
 	if (base) {
@@ -946,9 +957,9 @@ function addVoiceUser(userId) {
 	voiceUser.addEventListener("click", (e) => {
 		manageVoiceUser(e);
 	});
-	let friendPref = localPrefs.friends.filter((f) => f.id == userId)[0];
-	if (friendPref) {
-		voiceUser.style = `background-color: ${friendPref.color};`;
+	if (userColors[userId]) {
+		voiceUser.style.backgroundColor = userColors[userId];
+		voiceUser.style.color = HarmonyUtils.getBestTextColor(userColors[userId]);
 	}
 	document.getElementById("voice-list").appendChild(voiceUser);
 	//add talking animation

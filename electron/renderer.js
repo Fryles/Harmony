@@ -1,33 +1,24 @@
 // Globals for app
 var selectedServer = "HARMONY-FRIENDS-LIST";
 var selectedFriend;
-var currentChat;
-var localPrefs;
-var friendReqs = { incoming: [], outgoing: [] };
-var selfId;
-const dev = 1;
-
-// Global for stacking toasts
-let toastStackHeight = 0;
-
-// Add a global to track last xhr poll error toast time
-let lastLoopingToast = 0;
+var currentChat; //global to reference what channel we are in
+var localPrefs; //preferences object in mem to avoid multiple file reads
+let users = { colors: {}, usernames: {} }; //like localPrefs, but for general acquaintances and stored in localStorage
+var friendReqs = { incoming: [], outgoing: [] }; //synced with server on start, then updated with socket
+var selfId; //clients userId
+const dev = 1; //controls what server websockets talks to
+let toastStackHeight = 0; // Global for stacking toasts
+let lastLoopingToast = 0; // Global to stop spamming toasts
 
 main();
 
 async function main() {
-	//set save listener incase first load
-	document
-		.getElementById("settings-save")
-		.addEventListener("click", async () => {
-			if (await storePrefs()) {
-				closeModals();
-			}
-		});
+	loadUserColors();
+
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
 
-	if (!localPrefs) {
+	if (!localPrefs || !localPrefs.user || !localPrefs.user.userId || !localPrefs.user.password) {
 		//We rly cant do much without local prefs, just wait until user saves for first time then reload
 		return;
 	}
@@ -37,9 +28,14 @@ async function main() {
 	rtc = new rtcInterface();
 	checkFriendReqs();
 	if (!localPrefs.user.password) {
-		//get user to set password
+		//bro what
+		alert("idk how but u never set a password. please set one");
 	}
-
+	document.getElementById("settings-save").addEventListener("click", async () => {
+		if (await storePrefs()) {
+			closeModals();
+		}
+	});
 	document.getElementById("add-server").addEventListener("click", () => {
 		registerServer();
 	});
@@ -51,9 +47,7 @@ async function main() {
 	});
 
 	document.getElementById("hotMicThresh").onchange = () => {
-		rtc.hotMicThresh = parseFloat(
-			document.getElementById("hotMicThresh").value
-		);
+		rtc.hotMicThresh = parseFloat(document.getElementById("hotMicThresh").value);
 	};
 	var $modalButtons = getAll(".modal-button");
 	if ($modalButtons.length > 0) {
@@ -111,9 +105,7 @@ async function main() {
 					openModal("manage-friend-modal");
 					document.getElementById("manage-friend-remove").onclick = () => {
 						//remove friend from local prefs
-						localPrefs.friends = localPrefs.friends.filter(
-							(f) => f.id != friendId
-						);
+						localPrefs.friends = localPrefs.friends.filter((f) => f.id != friendId);
 						if (selectedFriend == friendId) {
 							selectedFriend = null;
 						}
@@ -129,9 +121,7 @@ async function main() {
 						//update friend list
 						div.innerHTML = "";
 						div.innerHTML = DOMPurify.sanitize(
-							friend.nick != "" && friend.nick != undefined
-								? `${friend.nick} (${friend.name})`
-								: friend.name
+							friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name
 						);
 						div.appendChild(manageBtn);
 						div.setAttribute("name", friend.id);
@@ -153,12 +143,8 @@ async function main() {
 		childList: true,
 	});
 
-	document
-		.getElementById("voice-mute")
-		.addEventListener("click", rtc.voiceMute);
-	document
-		.getElementById("voice-call")
-		.addEventListener("click", () => rtc.callVoice(currentChat));
+	document.getElementById("voice-mute").addEventListener("click", rtc.voiceMute);
+	document.getElementById("voice-call").addEventListener("click", () => rtc.callVoice(currentChat));
 
 	document.getElementById("serverOpen").addEventListener("change", (e) => {
 		const pwdInput = document.getElementById("serverPasswordInput");
@@ -238,8 +224,7 @@ async function registerServer() {
 	let options = {
 		serverOpen: document.getElementById("serverOpen").checked,
 		serverUnlisted: document.getElementById("serverUnlisted").checked,
-		serverStoredMessaging: document.getElementById("serverStoredMessaging")
-			.checked,
+		serverStoredMessaging: document.getElementById("serverStoredMessaging").checked,
 	};
 	if ((pwd === "" || !pwd) && !options.serverOpen) {
 		//empty pwd with non-open server
@@ -274,9 +259,7 @@ async function registerServer() {
 			// Add server to UI before the "Add Server" button
 			const serverList = document.getElementById("server-list");
 			if (serverList) {
-				const addServerBtn = serverList.querySelector(
-					'.server-item[name="HARMONY-ADD-SERVER"]'
-				);
+				const addServerBtn = serverList.querySelector('.server-item[name="HARMONY-ADD-SERVER"]');
 				const serverDiv = document.createElement("div");
 				serverDiv.className = "server-item";
 				serverDiv.setAttribute("name", res.server.id);
@@ -322,9 +305,7 @@ function addServer() {
 				// Add server to UI before the "Add Server" button
 				const serverList = document.getElementById("server-list");
 				if (serverList) {
-					const addServerBtn = serverList.querySelector(
-						'.server-item[name="HARMONY-ADD-SERVER"]'
-					);
+					const addServerBtn = serverList.querySelector('.server-item[name="HARMONY-ADD-SERVER"]');
 					const serverDiv = document.createElement("div");
 					serverDiv.className = "server-item";
 					serverDiv.setAttribute("name", res.id);
@@ -370,8 +351,7 @@ function sendFriendReq(userId) {
 		showToast("You ur own best fran og");
 		return;
 	}
-	const uuidv4Regex =
-		/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+	const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 	if (!uuidv4Regex.test(userId)) {
 		showToast("Invalid User ID (must be UUIDv4)");
 		return;
@@ -402,13 +382,9 @@ function checkFriendReqs() {
 			//got a response from a request we did not send, probably a cancellation
 			if (request.status == "cancelled" && request.to == selfId) {
 				//remove from incoming
-				friendReqs.incoming = friendReqs.incoming.filter(
-					(r) => r.chat != request.chat && r.from != request.from
-				);
+				friendReqs.incoming = friendReqs.incoming.filter((r) => r.chat != request.chat && r.from != request.from);
 				//update ui
-				let reqDiv = document.querySelector(
-					`.friend-request-item[reqFrom="${request.from}"]`
-				);
+				let reqDiv = document.querySelector(`.friend-request-item[reqFrom="${request.from}"]`);
 				if (reqDiv) {
 					reqDiv.remove();
 				}
@@ -427,17 +403,13 @@ function checkFriendReqs() {
 		} else {
 		}
 		//update friend requests
-		let reqDiv = document.querySelector(
-			`.friend-request-item[reqTo="${request.to}"]`
-		);
+		let reqDiv = document.querySelector(`.friend-request-item[reqTo="${request.to}"]`);
 		if (reqDiv) {
 			reqDiv.remove();
 		}
 		//remove our acked friend request from friendReqs.outgoing
 		if (friendReqs.outgoing) {
-			friendReqs.outgoing = friendReqs.outgoing.filter(
-				(r) => r.to != request.to
-			);
+			friendReqs.outgoing = friendReqs.outgoing.filter((r) => r.to != request.to);
 		}
 	});
 
@@ -448,18 +420,14 @@ function checkFriendReqs() {
 			//add to global friendReqs.incoming
 			if (!friendReqs.incoming) friendReqs.incoming = [];
 			//check if we already have this request
-			let existingReq = friendReqs.incoming.filter(
-				(r) => r.from == request.from
-			);
+			let existingReq = friendReqs.incoming.filter((r) => r.from == request.from);
 			if (existingReq.length == 0) {
 				friendReqs.incoming.push(request);
 			} else {
 				console.warn("Already have this request");
 				return;
 			}
-			showToast(
-				`${DOMPurify.sanitize(request.fromName)} Sent You a Friend Request`
-			);
+			showToast(`${DOMPurify.sanitize(request.fromName)} Sent You a Friend Request`);
 		}
 	});
 
@@ -472,9 +440,7 @@ function checkFriendReqs() {
 }
 
 function sendChat(content) {
-	const sanitizedContent = DOMPurify.sanitize(
-		content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, "")
-	);
+	const sanitizedContent = DOMPurify.sanitize(content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, ""));
 	//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM CURRENTCHAT
 	const msg = {
 		timestamp: Date.now(),
@@ -492,22 +458,34 @@ function sendChat(content) {
 
 function rcvChat(msg) {
 	channel = msg.channel;
+
+	// Track user data
+	if ((msg.user && msg.color) || (msg.user && msg.username)) {
+		if (users.colors[msg.user] !== msg.color || users.usernames[msg.user] !== msg.username) {
+			users.colors[msg.user] = msg.color;
+			users.usernames[msg.user] = msg.username;
+			saveUsers();
+		}
+		// If msg.user is in our friends, update prefs with new user name
+		if (localPrefs.friends) {
+			const friend = localPrefs.friends.find((f) => f.id === msg.user);
+			if (friend && msg.username && friend.name !== msg.username) {
+				friend.name = msg.username;
+				window.electronAPI.updatePrefs(localPrefs);
+			}
+		}
+	}
+
 	if (channel == currentChat) {
 		updateChat(msg);
 	} else {
-		const server = localPrefs.servers.find(
-			(s) => s.secret === channel.split(":")[1]
-		);
+		const server = localPrefs.servers.find((s) => s.secret === channel.split(":")[1]);
 		const user = userLookup(msg.user);
 		if (server) {
 			showToast(
-				`${user.nick ? user.nick : user.name} sent you a message on ${
-					server.name
-				}`,
+				`${user.nick ? user.nick : user.name} sent you a message on ${server.name}`,
 				() => {
-					const sovoBtn = document.querySelector(
-						`.server-item[name="${server.id}"]`
-					);
+					const sovoBtn = document.querySelector(`.server-item[name="${server.id}"]`);
 					if (sovoBtn) {
 						sovoBtn.dispatchEvent(new Event("click", { bubbles: true }));
 					}
@@ -520,13 +498,9 @@ function rcvChat(msg) {
 				() => {
 					if (selectedServer != "HARMONY-FRIENDS-LIST") {
 						//select friends server, then friend itself
-						const friendsListBtn = document.querySelector(
-							'.server-item[name="HARMONY-FRIENDS-LIST"]'
-						);
+						const friendsListBtn = document.querySelector('.server-item[name="HARMONY-FRIENDS-LIST"]');
 						if (friendsListBtn) {
-							friendsListBtn.dispatchEvent(
-								new Event("click", { bubbles: true })
-							);
+							friendsListBtn.dispatchEvent(new Event("click", { bubbles: true }));
 						}
 						// Find the friend and select them
 						const friend = localPrefs.friends.find((f) => f.id === msg.user);
@@ -581,9 +555,7 @@ function updateChat(msg) {
 		return;
 	}
 	// Remove all id attributes and sanitize from msg.content
-	const sanitizedContent = DOMPurify.sanitize(
-		msg.content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, "")
-	);
+	const sanitizedContent = DOMPurify.sanitize(msg.content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, ""));
 	let el = document.createElement("p");
 	let un = document.createElement("span");
 	un.className = "tag";
@@ -603,9 +575,7 @@ function updateChat(msg) {
 		sender.name = username;
 	}
 	un.innerHTML = DOMPurify.sanitize(
-		sender.nick != "" && sender.nick != undefined
-			? `${sender.nick} (${sender.name})`
-			: sender.name
+		sender.nick != "" && sender.nick != undefined ? `${sender.nick} (${sender.name})` : sender.name
 	);
 	un.setAttribute("data-user-id", msg.user);
 	un.setAttribute("data-timestamp", msg.timestamp);
@@ -650,12 +620,7 @@ function storeChat(msg, chatId) {
 	//filter dups (can occur with multiple windows/instances)
 	messages = messages.filter(
 		(m, i, arr) =>
-			arr.findIndex(
-				(x) =>
-					x.timestamp === m.timestamp &&
-					x.user === m.user &&
-					x.content === m.content
-			) === i
+			arr.findIndex((x) => x.timestamp === m.timestamp && x.user === m.user && x.content === m.content) === i
 	);
 
 	//constrain to less than localprefs maxMsgHistory
@@ -682,153 +647,11 @@ async function changePass(newPass) {
 	});
 }
 
-function selectFriend(e) {
-	let el = e.target || e;
-	if (
-		el.id == "friends-header" ||
-		el.classList.contains("friends-menu-item") ||
-		el.classList.contains("no-fire")
-	) {
-		return;
-	}
-	//stop icons from tweaking out
-	if (el.tagName.toLowerCase() != "div") {
-		if (el.parentElement) {
-			el.parentElement.dispatchEvent(new Event("click", { bubbles: true }));
-		}
-		return;
-	}
-	// Remove 'selected' class from all friend items except the clicked one
-	document.querySelectorAll(".friend-item.selected").forEach((item) => {
-		if (item !== el) {
-			item.classList.remove("selected");
-		}
-	});
-	// Add 'selected' class to the clicked friend item
-	el.classList.add("selected");
-	selectedFriend = el.getAttribute("name");
-	let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
-	if (privFriend && privFriend.chat) {
-		displayChat(privFriend.chat);
-	} else {
-		console.log("Error finding friend chat for ", selectedFriend);
-	}
-}
-
-function showFriendRequests() {
-	HarmonyUtils.removeClassFromAll(".friends-menu-item > i", "active");
-	document.getElementById("friendRequestsViewBtn").classList.add("active");
-	const friendsContainer = document.getElementById("friends");
-	HarmonyUtils.removeAllChildren(
-		friendsContainer,
-		".friend-item",
-		"friends-header"
-	);
-	HarmonyUtils.removeAllChildren(friendsContainer, ".friend-request-item");
-
-	const requests = Array.isArray(friendReqs.incoming)
-		? friendReqs.incoming
-		: [];
-	if (requests.length === 0) {
-		const noReq = document.createElement("div");
-		noReq.className = "friend-request-item";
-		noReq.textContent = "No pending friend requests.";
-		friendsContainer.appendChild(noReq);
-	}
-
-	requests.forEach((req) => {
-		if (req.from == selfId) return;
-		const reqDiv = document.createElement("div");
-		reqDiv.className = "friend-request-item";
-		reqDiv.innerHTML = `
-			<span>${DOMPurify.sanitize(req.fromName || req.from)}</span>
-			<span>
-			<span class="icon mx-1"><i class="accept-friend-request fas fa-xl fa-check-circle"></i></span>
-			<span class="icon ml-1"><i class="reject-friend-request fas fa-xl fa-circle-xmark"></i></span>
-			</span>
-		`;
-		reqDiv.setAttribute("reqFrom", DOMPurify.sanitize(req.from));
-		reqDiv.querySelector(".accept-friend-request").onclick = () => {
-			req.status = "accepted";
-			socket.emit("friendRequestResponse", req);
-			reqDiv.remove();
-			friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
-			//add friend to local prefs
-			localPrefs.friends.push({
-				name: req.fromName,
-				id: req.from,
-				chat: req.chat,
-			});
-			window.electronAPI.updatePrefs(localPrefs);
-			showToast(`${DOMPurify(req.fromName)} Is Now Your Friend!`);
-		};
-		reqDiv.querySelector(".reject-friend-request").onclick = () => {
-			req.status = "rejected";
-			socket.emit("friendRequestResponse", req);
-			reqDiv.remove();
-			friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
-			showToast(`Removed Friend Request`);
-		};
-		friendsContainer.appendChild(reqDiv);
-	});
-
-	const outgoingReqs = Array.isArray(friendReqs.outgoing)
-		? friendReqs.outgoing
-		: [];
-	if (outgoingReqs.length > 0) {
-		const outgoingDiv = document.createElement("div");
-		outgoingDiv.className =
-			"friend-request-item has-background-grey-dark has-text-white";
-		outgoingDiv.textContent = "Outgoing Friend Requests";
-		friendsContainer.appendChild(outgoingDiv);
-	}
-
-	outgoingReqs.forEach((req) => {
-		const reqDiv = document.createElement("div");
-		reqDiv.className = "friend-request-item";
-		reqDiv.innerHTML = `
-			<span>${DOMPurify.sanitize(req.toName || req.to)}</span>
-			<span class="icon mx-1"><i class="reject-friend-request fas fa-xl fa-circle-xmark"></i></span>
-		`;
-		reqDiv.setAttribute("reqTo", DOMPurify.sanitize(req.to));
-		reqDiv.querySelector(".reject-friend-request").onclick = () => {
-			socket.emit("cancelFriendRequest", req);
-			reqDiv.remove();
-			friendReqs.outgoing = friendReqs.outgoing.filter((r) => r.to !== req.to);
-			showToast(`Cancelled Friend Request`);
-		};
-		friendsContainer.appendChild(reqDiv);
-	});
-}
-
-function showFriends(e) {
-	HarmonyUtils.removeClassFromAll(".friends-menu-item > i", "active");
-	document.getElementById("friendsViewBtn").classList.add("active");
-
-	const friendsContainer = document.getElementById("friends");
-	HarmonyUtils.removeAllChildren(friendsContainer, ".friend-request-item");
-	HarmonyUtils.removeAllChildren(
-		friendsContainer,
-		".friend-item",
-		"friends-header"
-	);
-
-	if (localPrefs && Array.isArray(localPrefs.friends)) {
-		HarmonyUtils.populateFriendsList(
-			friendsContainer,
-			localPrefs.friends,
-			selectFriend
-		);
-	}
-}
-
 async function selectServerItem(e) {
 	//stop icons from tweaking out
 	if (e.target.tagName.toLowerCase() != "div") {
 		if (e.target.parentElement) {
-			e.target.parentElement.dispatchEvent(
-				new Event("click", { bubbles: true })
-			);
+			e.target.parentElement.dispatchEvent(new Event("click", { bubbles: true }));
 		}
 		return;
 	}
@@ -874,19 +697,15 @@ async function selectServerItem(e) {
 		chatEl.classList.add("expand");
 
 		let privServer = localPrefs.servers.find((f) => f.id == selectedServer);
-		if (
-			privServer &&
-			privServer.secret !== null &&
-			privServer.secret !== undefined
-		) {
+		if (privServer && privServer.secret !== null && privServer.secret !== undefined) {
 			chat = privServer.secret;
 			displayChat(chat);
 		} else {
 			console.log("Error finding Server password for ", selectedServer);
 		}
 	}
-	//if we are not in a mediaChannel, clear voice and update to new server when switching
-	if (!rtc.mediaChannel) {
+	//if we are not in a mediaChannel and not getting a ring, clear voice and update to new server when switching
+	if (!rtc.mediaChannel && !rtc.ring) {
 		// Clear all .voice-prof elements in #voice-list
 		const voiceList = document.getElementById("voice-list");
 		if (voiceList) {
@@ -894,21 +713,34 @@ async function selectServerItem(e) {
 		}
 		socket.emit("channelQuery", `voice:${chat}`, (res) => {
 			//check if anyone is in new channels vc
-			console.log(res);
+			if (res.length > 0) {
+				//add to vc ui and maybe update rtc channels?? shouldnt be needed i thinks
+				res.forEach((user) => {
+					addVoiceUser(user);
+				});
+			}
 		});
 	}
 }
 
 function userLookup(userId) {
-	if (!localPrefs || !localPrefs.friends)
-		return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
-	if (userId === localPrefs.user.userId) {
+	if (userId === selfId) {
 		return { name: localPrefs.user.username, nick: "" };
 	}
-	const friend = localPrefs.friends.find((f) => f.id === userId);
-	if (friend) {
-		return { name: friend.name, nick: friend.nick || "" };
+
+	if (!localPrefs.friends && !users.usernames[userId])
+		return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
+	if (localPrefs.friends) {
+		const friend = localPrefs.friends.find((f) => f.id === userId);
+
+		if (friend) {
+			return { name: friend.name, nick: friend.nick || "" };
+		}
 	}
+	if (users.usernames[userId]) {
+		return { name: users.usernames[userId], nick: "" };
+	}
+
 	return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 }
 
@@ -942,26 +774,16 @@ async function storePrefs() {
 
 	const passwordEl = document.getElementById("password");
 	// Password complexity check for user password
-	if (
-		!passwordEl.value ||
-		(passwordEl.value !== localPrefs.user.password &&
-			!isPasswordComplex(passwordEl.value))
-	) {
+	if (!passwordEl.value || (passwordEl.value !== localPrefs.user.password && !isPasswordComplex(passwordEl.value))) {
 		validateField(passwordEl);
 		showToast("Password must be at least 8 characters.");
 		return false;
 	}
-	if (passwordEl.value !== localPrefs.user.password)
-		changePass(passwordEl.value);
+	if (passwordEl.value !== localPrefs.user.password) changePass(passwordEl.value);
 
-	["videoInputDevice", "audioInputDevice", "audioOutputDevice"].forEach(
-		(id) => {
-			localPrefs.devices[id] = HarmonyUtils.getSelectedDevice(
-				id,
-				localPrefs.devices[id + "s"]
-			);
-		}
-	);
+	["videoInputDevice", "audioInputDevice", "audioOutputDevice"].forEach((id) => {
+		localPrefs.devices[id] = HarmonyUtils.getSelectedDevice(id, localPrefs.devices[id + "s"]);
+	});
 
 	["inputGain", "outputVolume", "hotMicThresh", "ringVolume"].forEach((id) => {
 		localPrefs.audio[id] = parseFloat(getVal(id));
@@ -991,9 +813,7 @@ function manageVoiceUser(e) {
 	const userId = userDiv.id;
 	let friend = userLookup(userId);
 	let username = DOMPurify.sanitize(
-		friend.nick != "" && friend.nick != undefined
-			? `${friend.nick} (${friend.name})`
-			: friend.name
+		friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name
 	);
 
 	// Create popup
@@ -1037,8 +857,7 @@ function manageVoiceUser(e) {
 	} else {
 		let voiceUserVolumes = {};
 		try {
-			voiceUserVolumes =
-				JSON.parse(localStorage.getItem("voiceUserVolumes")) || {};
+			voiceUserVolumes = JSON.parse(localStorage.getItem("voiceUserVolumes")) || {};
 		} catch (e) {
 			voiceUserVolumes = {};
 		}
@@ -1075,16 +894,12 @@ function manageVoiceUser(e) {
 				// Store in voiceUserVolumes in localStorage
 				let voiceUserVolumes = {};
 				try {
-					voiceUserVolumes =
-						JSON.parse(localStorage.getItem("voiceUserVolumes")) || {};
+					voiceUserVolumes = JSON.parse(localStorage.getItem("voiceUserVolumes")) || {};
 				} catch (e) {
 					voiceUserVolumes = {};
 				}
 				voiceUserVolumes[userId] = vol;
-				localStorage.setItem(
-					"voiceUserVolumes",
-					JSON.stringify(voiceUserVolumes)
-				);
+				localStorage.setItem("voiceUserVolumes", JSON.stringify(voiceUserVolumes));
 			}
 		}
 	};
@@ -1112,9 +927,7 @@ function manageChatUser(msgEl) {
 
 	let friend = userLookup(userId);
 	let username = DOMPurify.sanitize(
-		friend.nick != "" && friend.nick != undefined
-			? `${friend.nick} (${friend.name})`
-			: friend.name
+		friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name
 	);
 
 	// Format timestamp
@@ -1210,18 +1023,14 @@ async function hashbrown(pwd) {
 	const msgUint8 = new TextEncoder().encode(pwd); // encode as (utf-8) Uint8Array
 	const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgUint8); // hash the message
 	const hashArray = Array.from(new Uint8Array(hashBuffer)); // convert buffer to byte array
-	const hashHex = hashArray
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join(""); // convert bytes to hex string
+	const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join(""); // convert bytes to hex string
 	return hashHex;
 }
 
 //modal control
 var rootEl = document.documentElement;
 var $modals = getAll(".modal");
-var $modalCloses = getAll(
-	".modal-background, .modal-close, .modal-card-head .delete, .close"
-);
+var $modalCloses = getAll(".modal-background, .modal-close, .modal-card-head .delete, .close");
 
 if ($modalCloses.length > 0) {
 	$modalCloses.forEach(function ($el) {
@@ -1253,9 +1062,7 @@ function closeModals() {
 // Utility class for helper functions
 class HarmonyUtils {
 	static removeClassFromAll(selector, className) {
-		document
-			.querySelectorAll(selector)
-			.forEach((el) => el.classList.remove(className));
+		document.querySelectorAll(selector).forEach((el) => el.classList.remove(className));
 	}
 
 	static removeAllChildren(parent, selector, exceptId) {
@@ -1269,9 +1076,7 @@ class HarmonyUtils {
 			const friendDiv = document.createElement("div");
 			friendDiv.className = "friend-item";
 			friendDiv.setAttribute("name", DOMPurify.sanitize(friend.id));
-			friendDiv.textContent = DOMPurify.sanitize(
-				friend.nick ? `${friend.nick} (${friend.name})` : friend.name
-			);
+			friendDiv.textContent = DOMPurify.sanitize(friend.nick ? `${friend.nick} (${friend.name})` : friend.name);
 			friendDiv.addEventListener("click", FriendsManager.selectFriend, true);
 			container.appendChild(friendDiv);
 		});
@@ -1318,8 +1123,7 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 	toast.style.left = "50%";
 	toast.style.top = `calc(${baseTop}rem + ${stackOffset}rem)`;
 	toast.style.transform = "translate(-50%, -100%)";
-	toast.style.transition =
-		"transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s";
+	toast.style.transition = "transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s";
 	toast.style.zIndex = 9999;
 	toast.style.minWidth = "20px";
 
@@ -1341,9 +1145,7 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 	}
 
 	toast.innerHTML = `
-		${DOMPurify.sanitize(
-			msg
-		)}<button class="toastClose ml-2 mr-1"><span class="icon is-small">
+		${DOMPurify.sanitize(msg)}<button class="toastClose ml-2 mr-1"><span class="icon is-small">
       <i class="fas fa-xmark"></i>
     </span></button>
 	`;
@@ -1393,11 +1195,7 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 class FriendsManager {
 	static selectFriend(e) {
 		let el = e.target || e;
-		if (
-			el.id == "friends-header" ||
-			el.classList.contains("friends-menu-item") ||
-			el.classList.contains("no-fire")
-		) {
+		if (el.id == "friends-header" || el.classList.contains("friends-menu-item") || el.classList.contains("no-fire")) {
 			return;
 		}
 		//stop icons from tweaking out
@@ -1406,6 +1204,13 @@ class FriendsManager {
 				el.parentElement.dispatchEvent(new Event("click", { bubbles: true }));
 			}
 			return;
+		}
+		// If selectedServer is not "HARMONY-FRIENDS-LIST", select it first
+		if (selectedServer !== "HARMONY-FRIENDS-LIST") {
+			const friendsListBtn = document.querySelector('.server-item[name="HARMONY-FRIENDS-LIST"]');
+			if (friendsListBtn) {
+				friendsListBtn.dispatchEvent(new Event("click", { bubbles: true }));
+			}
 		}
 		// Remove 'selected' class from all friend items except the clicked one
 		document.querySelectorAll(".friend-item.selected").forEach((item) => {
@@ -1428,16 +1233,10 @@ class FriendsManager {
 		HarmonyUtils.removeClassFromAll(".friends-menu-item > i", "active");
 		document.getElementById("friendRequestsViewBtn").classList.add("active");
 		const friendsContainer = document.getElementById("friends");
-		HarmonyUtils.removeAllChildren(
-			friendsContainer,
-			".friend-item",
-			"friends-header"
-		);
+		HarmonyUtils.removeAllChildren(friendsContainer, ".friend-item", "friends-header");
 		HarmonyUtils.removeAllChildren(friendsContainer, ".friend-request-item");
 
-		const requests = Array.isArray(friendReqs.incoming)
-			? friendReqs.incoming
-			: [];
+		const requests = Array.isArray(friendReqs.incoming) ? friendReqs.incoming : [];
 		if (requests.length === 0) {
 			const noReq = document.createElement("div");
 			noReq.className = "friend-request-item";
@@ -1461,9 +1260,7 @@ class FriendsManager {
 				req.status = "accepted";
 				socket.emit("friendRequestResponse", req);
 				reqDiv.remove();
-				friendReqs.incoming = friendReqs.incoming.filter(
-					(r) => r.id !== req.id
-				);
+				friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
 				//add friend to local prefs
 				localPrefs.friends.push({
 					name: req.fromName,
@@ -1477,21 +1274,16 @@ class FriendsManager {
 				req.status = "rejected";
 				socket.emit("friendRequestResponse", req);
 				reqDiv.remove();
-				friendReqs.incoming = friendReqs.incoming.filter(
-					(r) => r.id !== req.id
-				);
+				friendReqs.incoming = friendReqs.incoming.filter((r) => r.id !== req.id);
 				showToast(`Removed Friend Request`);
 			};
 			friendsContainer.appendChild(reqDiv);
 		});
 
-		const outgoingReqs = Array.isArray(friendReqs.outgoing)
-			? friendReqs.outgoing
-			: [];
+		const outgoingReqs = Array.isArray(friendReqs.outgoing) ? friendReqs.outgoing : [];
 		if (outgoingReqs.length > 0) {
 			const outgoingDiv = document.createElement("div");
-			outgoingDiv.className =
-				"friend-request-item has-background-grey-dark has-text-white";
+			outgoingDiv.className = "friend-request-item has-background-grey-dark has-text-white";
 			outgoingDiv.textContent = "Outgoing Friend Requests";
 			friendsContainer.appendChild(outgoingDiv);
 		}
@@ -1507,9 +1299,7 @@ class FriendsManager {
 			reqDiv.querySelector(".reject-friend-request").onclick = () => {
 				socket.emit("cancelFriendRequest", req);
 				reqDiv.remove();
-				friendReqs.outgoing = friendReqs.outgoing.filter(
-					(r) => r.to !== req.to
-				);
+				friendReqs.outgoing = friendReqs.outgoing.filter((r) => r.to !== req.to);
 				showToast(`Cancelled Friend Request`);
 			};
 			friendsContainer.appendChild(reqDiv);
@@ -1522,18 +1312,25 @@ class FriendsManager {
 
 		const friendsContainer = document.getElementById("friends");
 		HarmonyUtils.removeAllChildren(friendsContainer, ".friend-request-item");
-		HarmonyUtils.removeAllChildren(
-			friendsContainer,
-			".friend-item",
-			"friends-header"
-		);
+		HarmonyUtils.removeAllChildren(friendsContainer, ".friend-item", "friends-header");
 
 		if (localPrefs && Array.isArray(localPrefs.friends)) {
-			HarmonyUtils.populateFriendsList(
-				friendsContainer,
-				localPrefs.friends,
-				FriendsManager.selectFriend
-			);
+			HarmonyUtils.populateFriendsList(friendsContainer, localPrefs.friends, FriendsManager.selectFriend);
 		}
 	}
+}
+
+// Load userColors from localStorage on startup
+function loadUserColors() {
+	try {
+		const stored = localStorage.getItem("userColors");
+		userColors = stored ? JSON.parse(stored) : {};
+	} catch (e) {
+		userColors = {};
+	}
+}
+
+// Save userColors to localStorage only if dirty
+function saveUsers() {
+	localStorage.setItem("userColors", JSON.stringify(userColors));
 }

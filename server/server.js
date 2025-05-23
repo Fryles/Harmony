@@ -200,10 +200,20 @@ io.on("connection", (socket) => {
 		//get all peers on this voice channel and pass to callback
 		//TODO this should probably have some throttle
 		const clients = io.sockets.adapter.rooms.get(chnl);
+
 		if (!clients) {
 			callback([]);
 		} else {
-			callback(clients);
+			// Map socket ids to peerIds
+			const peerIds = Array.from(clients)
+				.map((socketId) => {
+					const entry = Object.entries(connections).find(
+						([peerId, conn]) => conn.socketId === socketId
+					);
+					return entry ? entry[0] : null;
+				})
+				.filter(Boolean);
+			callback(peerIds);
 		}
 	});
 
