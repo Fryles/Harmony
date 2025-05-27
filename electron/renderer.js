@@ -686,7 +686,7 @@ async function selectServerItem(e) {
 		let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
 		if (privFriend && privFriend.chat) {
 			chat = privFriend.chat;
-			displayChat();
+			displayChat(chat);
 		} else {
 			//no friend chat to display, show empty chat
 			displayChat(null);

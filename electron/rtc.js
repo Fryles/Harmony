@@ -25,7 +25,7 @@ class rtcInterface {
 
 	_registerSocketEvents() {
 		if (!window.socket) {
-			setTimeout(this._registerSocketEvents, 5000);
+			setTimeout(this._registerSocketEvents, 1000);
 		} else if (!this.socket && window.socket) {
 			this.socket = window.socket;
 		}
@@ -166,12 +166,15 @@ class rtcInterface {
 			//TODO add case for video
 		} else if (this.ring && this.ring.type == "incoming voice") {
 			// Incoming ring, pick up
-			this.voiceJoin(this.ring.channel);
+			this.voiceJoin(setChannelType(this.ring.channel, "voice"));
 			return;
 		} else {
 			// Not in a call, not ringing, start/join voice channel
 			if (channel && !this.ring && !this.mediaChannel) {
-				this.preRing(channel);
+				//stop any existing ring
+				this.voiceRingEnd();
+				//now we wait for a peer response from server, which calls voiceRing if we are alone
+				this.voiceJoin(setChannelType(channel, "voice"));
 			} else {
 				console.warn("No current channel to join for voice call.");
 			}
@@ -265,7 +268,7 @@ class rtcInterface {
 			setVoiceUIState("idle");
 		} else {
 			//move state to in inCall
-			setVoiceUIState("inCall", this.ring.channel.split(":")[1]);
+			setVoiceUIState("inCall", this.ring.channel);
 		}
 		if (this.ring) {
 			this.ring.audio.pause();
@@ -281,6 +284,11 @@ class rtcInterface {
 	}
 
 	async voiceJoin(channel) {
+		if (channel == this.mediaChannel) {
+			//already in this channel, do nothing
+			console.warn("Attempted to join voice channel we are already in");
+			return;
+		}
 		if (!this.localAudioStream) {
 			await this._initLocalAudio();
 			if (!this.localAudioStream) {
@@ -293,18 +301,10 @@ class rtcInterface {
 			this.voiceRingEnd();
 		}
 		//change color of call button and stop anims
-		setVoiceUIState("inCall", channel.split(":")[1]);
+		setVoiceUIState("inCall", channel);
 		//add ourselves to ui
 		addVoiceUser(selfId);
 		this.joinChannel(channel);
-	}
-
-	preRing(channel) {
-		//stop any existing ring
-		this.voiceRingEnd();
-
-		//now we wait for a peer response from server, which calls voiceRing if we are alone
-		this.voiceJoin(setChannelType(channel, "voice"));
 	}
 
 	voiceRing(channel) {
@@ -380,7 +380,7 @@ class rtcInterface {
 					this.VoiceHangup();
 					const serverElem = document.querySelector(`.server-item[name="${server.id}"]`);
 					if (serverElem) {
-						selectServerItem(serverElem);
+						serverElem.click();
 					} else {
 						console.error("Could not find server that user is being called on", server);
 					}
@@ -412,7 +412,7 @@ class rtcInterface {
 			showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
 				const serverElem = document.querySelector(`.server-item[name="${server.id}"]`);
 				if (serverElem) {
-					selectServerItem(serverElem);
+					serverElem.click();
 				} else {
 					console.error("Could not find server that user is being called on", server);
 				}
@@ -849,6 +849,37 @@ function setVoiceUIState(state, id = "") {
 	const servers = document.querySelectorAll(".server-item");
 	if (!mute || !vcEl || !list || !servers || !friends) return;
 
+	// Helper to find a friend or server id from a chat/channel string
+	function findIdFromChannel(channel) {
+		if (!channel || typeof channel !== "string") return null;
+		var base;
+		if (channel.startsWith("chat:") || channel.startsWith("voice:") || channel.startsWith("video:")) {
+			// If channel is in format "type:base", we can extract the base
+			base = channel.split(":")[1];
+		} else {
+			base = channel; // If no colon, assume the whole string is the base
+		}
+		if (!base) return null;
+		// Try to find friend by chat
+		const friend = (localPrefs.friends || []).find((f) => f.chat === channel || f.chat === base);
+		if (friend) return friend.id;
+		// Try to find server by secret
+		const server = (localPrefs.servers || []).find((s) => s.secret === base);
+		if (server) return server.id;
+		return null;
+	}
+	var idEl = null;
+	if (id) {
+		idEl = document.querySelector(`[name="${id}"]`);
+		if (!idEl) {
+			id = findIdFromChannel(id);
+			if (id) {
+				idEl = document.querySelector(`[name="${id}"]`);
+			} else {
+				console.error("Could not find element to style from ", id);
+			}
+		}
+	}
 	// Reset all relevant classes
 	mute.classList.add("is-hidden");
 	vcEl.classList.remove("ringing", "pickup", "has-text-primary", "has-text-danger", "danger");
@@ -859,10 +890,9 @@ function setVoiceUIState(state, id = "") {
 			mute.classList.remove("is-hidden");
 			vcEl.classList.add("ringing", "pickup");
 			list.classList.add("ringing");
-			if (id) {
-				const elem = document.querySelector(`[name="${id}"]`);
-				if (elem) {
-					if (elem.classList.contains("server-item")) {
+			if (idEl) {
+				if (idEl) {
+					if (idEl.classList.contains("server-item")) {
 						// Server ringing
 						servers.forEach((s) => {
 							if (s.getAttribute("name") == id) {
@@ -871,7 +901,7 @@ function setVoiceUIState(state, id = "") {
 								s.classList.remove("ringing");
 							}
 						});
-					} else if (elem.classList.contains("friend-item")) {
+					} else if (idEl.classList.contains("friend-item")) {
 						// Friend ringing
 						document.querySelector(`.server-item[name="HARMONY-FRIENDS-LIST"]`).classList.add("ringing");
 						friends.forEach((f) => {
@@ -898,8 +928,7 @@ function setVoiceUIState(state, id = "") {
 				s.classList.remove("ringing");
 				s.classList.remove("call");
 			});
-			let call = document.querySelector(`[name="${id}"]`);
-			if (call) {
+			if (idEl) {
 				vcEl.classList.add("call");
 			}
 			if (vcEl.classList.contains("friend-item")) {
@@ -938,6 +967,11 @@ function setChannelType(channel, type) {
 }
 
 function addVoiceUser(userId) {
+	//check if user already Added
+	if (document.getElementById(userId)) {
+		console.warn(`User ${userId} already added to voice UI`);
+		return;
+	}
 	//add specified user to ui
 	const voiceUser = document.createElement("div");
 	voiceUser.classList.add("voice-prof");
