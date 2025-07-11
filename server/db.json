@@ -2,16 +2,16 @@
   "requests": [],
   "users": {
     "f842a398-9470-4644-8165-64aad570267f": {
-      "name": "Fluffy Ghost",
+      "name": "matchamatcha",
       "secret": "b2fe6cd46334bdada6e231e3db867463bd8e79f5ffb9b3f0fb0a0961f4d2ad57",
-      "session": "c9e2ad21cf9fb323c1c2d1465efb1942",
-      "sessionTimestamp": 1748372498734
+      "session": "2603e8662e1256f9da18231a6976f707",
+      "sessionTimestamp": 1752266036246
     },
     "a268f8bb-a15a-48cc-90fd-f92642f41b95": {
-      "name": "Quantum Owl",
-      "secret": "17574bba78106ccd61732675d29252d4916ed9a2134fe01b2737cfadb55d4dc6",
-      "session": "6255b85c38a5893d7cf05c9a577c249d",
-      "sessionTimestamp": 1748372893773
+      "name": "magentas",
+      "secret": "f86fd27c170cbe8f67f5ece71cd059b5176f709ba1c262fda61ccfc5017429da",
+      "session": "825469ac58519780bd9e51dc4bc78df1",
+      "sessionTimestamp": 1752266043882
     }
   },
   "ips": {},
@@ -27,6 +27,339 @@
       },
       "admin": "f842a398-9470-4644-8165-64aad570267f",
       "messages": []
+    },
+    "test": {
+      "name": "test",
+      "id": "2a9aa2f3-f477-4ea0-9b0c-a48c28902043",
+      "secret": "4d843073fb5fbf710e58a952f9475e3cb777011ecc065f6ab870f2cd28a2f4ea",
+      "options": {
+        "serverOpen": false,
+        "serverUnlisted": false,
+        "serverStoredMessaging": true
+      },
+      "admin": "f842a398-9470-4644-8165-64aad570267f",
+      "messages": [
+        {
+          "timestamp": 1752165255061,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "BUH",
+          "channel": "chat:4d843073fb5fbf710e58a952f9475e3cb777011ecc065f6ab870f2cd28a2f4ea",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752165290898,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "lol",
+          "channel": "chat:4d843073fb5fbf710e58a952f9475e3cb777011ecc065f6ab870f2cd28a2f4ea",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752165297466,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "hi?",
+          "channel": "chat:4d843073fb5fbf710e58a952f9475e3cb777011ecc065f6ab870f2cd28a2f4ea",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752165574496,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "word",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752166681847,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "asd74",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752166704345,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "asd",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752169196626,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "asd",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752169198245,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "hello",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752169202406,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "yo",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752169423830,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "hi",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752169441693,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "work?",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752171754057,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "asd",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752176592597,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owls",
+          "content": "asd",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752176599767,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "k",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752176608996,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owls",
+          "content": "g",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752238618534,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "pople",
+          "content": "buh",
+          "type": "text",
+          "color": "#db4dcd"
+        },
+        {
+          "timestamp": 1752239114892,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "pople",
+          "content": "asd",
+          "type": "text",
+          "color": "#db4dcd"
+        },
+        {
+          "timestamp": 1752265615279,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "magentas",
+          "content": "work",
+          "type": "text",
+          "color": "#db4dcd"
+        }
+      ]
+    },
+    "test3": {
+      "name": "test3",
+      "id": "9e41874d-4df7-4353-a5ce-a7e3a898602e",
+      "secret": "7cb91d4d6b9a1576625dbc8674373b0d9d8da902de3b91e64f10ee2a26049de8",
+      "options": {
+        "serverOpen": true,
+        "serverUnlisted": false,
+        "serverStoredMessaging": true
+      },
+      "admin": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+      "messages": [
+        {
+          "timestamp": 1752171699455,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "yo",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752171701651,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "testiong",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752171751701,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "asdadd",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752171814477,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "asdasdasd",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752171821885,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "asdasd",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752171848897,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "ddd",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752171867546,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "asdasd",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752171885937,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "asd",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752171921278,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "Quantum Owl",
+          "content": "ateset'",
+          "type": "text",
+          "color": "#dbdbcd"
+        },
+        {
+          "timestamp": 1752171934604,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "ok",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752171954057,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "j",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752171954427,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "j",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752171954715,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "h",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752171955081,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "h",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752171955464,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "g",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752176604471,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "k",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752176928333,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "lower window",
+          "content": "yuh",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752265156046,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "magenta",
+          "content": "buh",
+          "type": "text",
+          "color": "#db4dcd"
+        },
+        {
+          "timestamp": 1752265173998,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "magenta",
+          "content": "d",
+          "type": "text",
+          "color": "#db4dcd"
+        },
+        {
+          "timestamp": 1752265202320,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "magenta",
+          "content": "test",
+          "type": "text",
+          "color": "#db4dcd"
+        }
+      ]
     }
   }
 }

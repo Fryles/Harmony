@@ -1,26 +1,14 @@
 {
   "user": {
-    "username": "Quantum Owl",
+    "username": "magentas",
     "userId": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
-    "password": "12345678"
+    "password": "987654321"
   },
   "servers": [
     {
       "name": "test",
-      "id": "53c8df7d-bffb-4c31-852d-250f56be703c",
-      "secret": "a4329d503dd23225bd88b60b0bb23cddbd3e7ac790d317f7ce214064f50e8e57",
-      "options": {
-        "serverOpen": false,
-        "serverUnlisted": false,
-        "serverStoredMessaging": true
-      },
-      "admin": "78fc19d8-f580-4632-aa1b-149244604644",
-      "messages": []
-    },
-    {
-      "name": "sovo sovo",
-      "id": "9ed37836-dace-4f71-a311-424f58170a5f",
-      "secret": "e8d13cfb6a8fe5ee135657438bf85dba8b6fe26f5bce27d66e019bd1d691fa79",
+      "id": "2a9aa2f3-f477-4ea0-9b0c-a48c28902043",
+      "secret": "4d843073fb5fbf710e58a952f9475e3cb777011ecc065f6ab870f2cd28a2f4ea",
       "options": {
         "serverOpen": false,
         "serverUnlisted": false,
@@ -30,21 +18,21 @@
       "messages": []
     },
     {
-      "name": "asd",
-      "id": "3a517a7a-3eaa-42a3-816e-897896688e1e",
-      "secret": "203c790f8bd5be13358d46f597d369ab1bf967f05590e88d0b51def33b7154b6",
+      "name": "test3",
+      "id": "9e41874d-4df7-4353-a5ce-a7e3a898602e",
+      "secret": "7cb91d4d6b9a1576625dbc8674373b0d9d8da902de3b91e64f10ee2a26049de8",
       "options": {
         "serverOpen": true,
         "serverUnlisted": false,
         "serverStoredMessaging": true
       },
-      "admin": "f842a398-9470-4644-8165-64aad570267f",
+      "admin": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
       "messages": []
     }
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#dbdbcd",
+    "accentColor": "#db4dcd",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true,
@@ -52,11 +40,9 @@
   },
   "friends": [
     {
-      "name": "lower window",
+      "name": "matchamatcha",
       "id": "f842a398-9470-4644-8165-64aad570267f",
-      "chat": "89210a67be76b11d3329c1796fbc00607c15fbc36a5bca9c",
-      "volume": 1,
-      "nick": ""
+      "chat": "31c161718c90483c5ca089ef70b92409f4985b5a2441b0c3"
     }
   ],
   "devices": {

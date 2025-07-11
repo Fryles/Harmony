@@ -1,19 +1,20 @@
 // Globals for app
 var selectedServer = "HARMONY-FRIENDS-LIST";
-var selectedFriend;
+var selectedFriend; //global to reference what friend we are in chat with
 var currentChat; //global to reference what channel we are in
 var localPrefs; //preferences object in mem to avoid multiple file reads
-let users = { colors: {}, usernames: {} }; //like localPrefs, but for general acquaintances and stored in localStorage
+var userCache = {}; //stores id username pairs
+var userCacheTTL = 1000 * 60 * 30; // 30 minute
 var friendReqs = { incoming: [], outgoing: [] }; //synced with server on start, then updated with socket
 var selfId; //clients userId
 const dev = 1; //controls what server websockets talks to
 let toastStackHeight = 0; // Global for stacking toasts
 let lastLoopingToast = 0; // Global to stop spamming toasts
 
-main();
+init();
 
-async function main() {
-	loadUserColors();
+async function init() {
+	loadUserCache();
 
 	//set local prefs
 	localPrefs = await window.electronAPI.getPrefs();
@@ -26,11 +27,12 @@ async function main() {
 
 	await webSocketInit();
 	rtc = new rtcInterface();
-	checkFriendReqs();
+	FriendsManager.checkFriendReqs();
 	if (!localPrefs.user.password) {
 		//bro what
 		alert("idk how but u never set a password. please set one");
 	}
+
 	document.getElementById("settings-save").addEventListener("click", async () => {
 		if (await storePrefs()) {
 			closeModals();
@@ -43,7 +45,7 @@ async function main() {
 		addServer();
 	});
 	document.getElementById("add-friend").addEventListener("click", () => {
-		sendFriendReq(document.getElementById("friendIdInput").value);
+		FriendsManager.sendFriendReq(document.getElementById("friendIdInput").value);
 	});
 
 	document.getElementById("hotMicThresh").onchange = () => {
@@ -104,12 +106,9 @@ async function main() {
 					//open modal
 					openModal("manage-friend-modal");
 					document.getElementById("manage-friend-remove").onclick = () => {
-						//remove friend from local prefs
-						localPrefs.friends = localPrefs.friends.filter((f) => f.id != friendId);
-						if (selectedFriend == friendId) {
-							selectedFriend = null;
-						}
-						window.electronAPI.updatePrefs(localPrefs);
+						FriendsManager.removeFriend(friendId, () => {
+							showToast(`Removed ${friend.name} from friends`);
+						});
 						//remove from ui
 						div.remove();
 						closeModals();
@@ -171,6 +170,35 @@ async function main() {
 			});
 		}
 	}
+
+	// retrieve any stored messages on server for all chats that support it
+	let since = localStorage.getItem("lastOnline") || Date.now() - 24 * 60 * 60 * 1000; // default to 24 hours ago if not set
+	if (localPrefs && localPrefs.servers) {
+		localPrefs.servers.forEach((server) => {
+			if (server.options && server.options.serverStoredMessaging) {
+				socket.emit("getServerMessages", server.id, since, (serverResponse) => {
+					if (!serverResponse.success) {
+						console.error(`Failed to retrieve messages for server ${server.name}:`, serverResponse.error);
+						return;
+					}
+					if (dev) {
+						console.log(`Retrieved ${serverResponse.messages.length} msgs for server ${server.name}`);
+					}
+					serverResponse.messages.forEach((msg) => {
+						msg.channel = `chat:${server.secret}`;
+						storeChat(msg);
+					});
+				});
+			}
+		});
+	}
+
+	// setInterval to update local storage "lastOnline" every 30s
+	setInterval(() => {
+		localStorage.setItem("lastOnline", Date.now());
+	}, 20 * 1000); // 20 seconds
+
+	//poll server for our friends to see if there are any updates
 }
 
 async function webSocketInit() {
@@ -335,112 +363,12 @@ function addServer() {
 	});
 }
 
-function sendFriendReq(userId) {
-	if (localPrefs.friends.filter((f) => f.id == userId).length > 0) {
-		//already friends
-		showToast("Already Friends With This User");
-		return;
-	}
-	if (friendReqs.outgoing.filter((r) => r.to == userId).length > 0) {
-		//already sent req
-		showToast("Already Sent Request");
-		return;
-	}
-	if (userId == selfId) {
-		//can't send friend request to self
-		showToast("You ur own best fran og");
-		return;
-	}
-	const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-	if (!uuidv4Regex.test(userId)) {
-		showToast("Invalid User ID (must be UUIDv4)");
-		return;
-	}
-
-	console.log("sending fr for ", userId);
-	//update ui for loading
-	socket.emit("friendRequest", userId, (data) => {
-		if (data.status == "awaiting") {
-			console.log(data);
-			//check if we already have this request
-			let existingReq = friendReqs.outgoing.filter((r) => r.to == userId);
-			if (existingReq.length == 0) {
-				friendReqs.outgoing.push(data);
-			} else {
-				console.warn("Already have this request");
-			}
-		}
-	});
-	closeModals();
-	showToast("Sent Friend Request");
-	document.getElementById("friendIdInput").value = "";
-}
-
-function checkFriendReqs() {
-	socket.on("friendRequestResponse", (request) => {
-		if (request.from != selfId) {
-			//got a response from a request we did not send, probably a cancellation
-			if (request.status == "cancelled" && request.to == selfId) {
-				//remove from incoming
-				friendReqs.incoming = friendReqs.incoming.filter((r) => r.chat != request.chat && r.from != request.from);
-				//update ui
-				let reqDiv = document.querySelector(`.friend-request-item[reqFrom="${request.from}"]`);
-				if (reqDiv) {
-					reqDiv.remove();
-				}
-			}
-			return;
-		}
-		//else outgoing req
-		if (request.status == "accepted") {
-			localPrefs.friends.push({
-				name: request.toName,
-				id: request.to,
-				chat: request.chat,
-			});
-			window.electronAPI.updatePrefs(localPrefs);
-			showToast(`${DOMPurify(request.toName)} Is Now Your Friend!`);
-		} else {
-		}
-		//update friend requests
-		let reqDiv = document.querySelector(`.friend-request-item[reqTo="${request.to}"]`);
-		if (reqDiv) {
-			reqDiv.remove();
-		}
-		//remove our acked friend request from friendReqs.outgoing
-		if (friendReqs.outgoing) {
-			friendReqs.outgoing = friendReqs.outgoing.filter((r) => r.to != request.to);
-		}
-	});
-
-	socket.on("friendRequest", (request) => {
-		//got a friend request
-		console.log("got friend request", request);
-		if (request.from != selfId && request.to == selfId) {
-			//add to global friendReqs.incoming
-			if (!friendReqs.incoming) friendReqs.incoming = [];
-			//check if we already have this request
-			let existingReq = friendReqs.incoming.filter((r) => r.from == request.from);
-			if (existingReq.length == 0) {
-				friendReqs.incoming.push(request);
-			} else {
-				console.warn("Already have this request");
-				return;
-			}
-			showToast(`${DOMPurify.sanitize(request.fromName)} Sent You a Friend Request`);
-		}
-	});
-
-	socket.emit("checkFriendReqs", ({ incoming, outgoing }) => {
-		console.log(incoming, outgoing);
-		//store to global friendReqs
-		friendReqs.incoming = incoming;
-		friendReqs.outgoing = outgoing;
-	});
-}
-
 function sendChat(content) {
 	const sanitizedContent = DOMPurify.sanitize(content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, ""));
+	if (!sanitizedContent || sanitizedContent.trim() === "" || sanitizedContent.length > 1000) {
+		showToast("Invalid message content. Must be non-empty and less than 1000 characters.");
+		return;
+	}
 	//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM CURRENTCHAT
 	const msg = {
 		timestamp: Date.now(),
@@ -448,23 +376,38 @@ function sendChat(content) {
 		username: localPrefs.user.username,
 		content: sanitizedContent,
 		channel: currentChat,
+		type: "text",
 		color: localPrefs.settings.accentColor,
 	};
 	updateChat(msg);
-	storeChat(msg, currentChat);
+	storeChat(msg);
 	rtc.sendMessage(msg, currentChat);
-	//TODO if on a server with serverStoredMessaging, send to server as well
+
+	// Check if currentChat is a server chat and if serverStoredMessaging is enabled
+	let server = null;
+	if (currentChat) {
+		const secret = currentChat.split(":")[1];
+		server = localPrefs.servers && localPrefs.servers.find((s) => s.secret === secret);
+	}
+	if (server && server.options && server.options.serverStoredMessaging) {
+		socket.emit("serverMessage", server.id, msg, (serverResponse) => {
+			if (serverResponse.success) {
+				console.log("Message stored on server:", serverResponse);
+			} else {
+				console.error("Failed to store message on server:", serverResponse.error);
+			}
+		});
+	}
 }
 
 function rcvChat(msg) {
 	channel = msg.channel;
 
 	// Track user data
-	if ((msg.user && msg.color) || (msg.user && msg.username)) {
-		if (users.colors[msg.user] !== msg.color || users.usernames[msg.user] !== msg.username) {
-			users.colors[msg.user] = msg.color;
-			users.usernames[msg.user] = msg.username;
-			saveUsers();
+	if (msg.user && msg.username) {
+		if (userCache[msg.user].name !== msg.username) {
+			userCache[msg.user].name = msg.username;
+			saveUserCache();
 		}
 		// If msg.user is in our friends, update prefs with new user name
 		if (localPrefs.friends) {
@@ -516,7 +459,7 @@ function rcvChat(msg) {
 			);
 		}
 	}
-	storeChat(msg, channel);
+	storeChat(msg);
 }
 
 function displayChat(chatId) {
@@ -527,8 +470,13 @@ function displayChat(chatId) {
 	if (currentChat == chatId) {
 		return;
 	}
+	//get serverId from chatId
 	//get messages from browser
-	currentChat = `chat:${chatId}`;
+	if (!chatId.startsWith("chat:")) {
+		currentChat = `chat:${chatId}`;
+	} else {
+		currentChat = chatId;
+	}
 	var messages = [];
 	try {
 		const existing = localStorage.getItem(currentChat);
@@ -551,7 +499,7 @@ function displayChat(chatId) {
 function updateChat(msg) {
 	//add msg to chat
 	if (!msg || !msg.user || !msg.content) {
-		showToast("I'm Not Sending That!");
+		showToast("Bad message!");
 		return;
 	}
 	// Remove all id attributes and sanitize from msg.content
@@ -571,10 +519,10 @@ function updateChat(msg) {
 
 	let username = msg.username;
 	let sender = userLookup(msg.user);
-	if (username) {
-		sender.name = username;
-	}
-	un.innerHTML = DOMPurify.sanitize(
+	// if (username) {
+	// 	sender.name = username;
+	// }
+	un.innerText = DOMPurify.sanitize(
 		sender.nick != "" && sender.nick != undefined ? `${sender.nick} (${sender.name})` : sender.name
 	);
 	un.setAttribute("data-user-id", msg.user);
@@ -599,10 +547,10 @@ function updateChat(msg) {
 	chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function storeChat(msg, chatId) {
+function storeChat(msg) {
 	//TODO THIS IS KINDA BLOATED
 	//adds message to respective chat and stores it
-	const key = chatId;
+	const key = msg.channel;
 	let messages = [];
 	try {
 		const existing = localStorage.getItem(key);
@@ -629,22 +577,6 @@ function storeChat(msg, chatId) {
 	}
 
 	localStorage.setItem(key, JSON.stringify(messages));
-}
-
-async function changePass(newPass) {
-	if (!isPasswordComplex(newPass)) {
-		showToast("Password must be at least 8 characters.");
-		return;
-	}
-	let newSecret = await hashbrown(`${selfId}:${newPass}`);
-	rtc.socket.emit("changePass", newSecret, (e) => {
-		if (e.success) {
-			localPrefs.user.password = newPass;
-			window.electronAPI.updatePrefs(localPrefs);
-		} else {
-			//notify failure
-		}
-	});
 }
 
 async function selectServerItem(e) {
@@ -701,7 +633,9 @@ async function selectServerItem(e) {
 			chat = privServer.secret;
 			displayChat(chat);
 		} else {
-			console.log("Error finding Server password for ", selectedServer);
+			//no server chat to display, show empty chat
+			displayChat(null);
+			console.log("Error finding server chat for ", selectedServer);
 		}
 	}
 	//if we are not in a mediaChannel and not getting a ring, clear voice and update to new server when switching
@@ -728,8 +662,7 @@ function userLookup(userId) {
 		return { name: localPrefs.user.username, nick: "" };
 	}
 
-	if (!localPrefs.friends && !users.usernames[userId])
-		return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
+	if (!localPrefs.friends && !userCache[userId]) return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 	if (localPrefs.friends) {
 		const friend = localPrefs.friends.find((f) => f.id === userId);
 
@@ -737,8 +670,8 @@ function userLookup(userId) {
 			return { name: friend.name, nick: friend.nick || "" };
 		}
 	}
-	if (users.usernames[userId]) {
-		return { name: users.usernames[userId], nick: "" };
+	if (userCache[userId]) {
+		return { name: userCache[userId].name, nick: "" };
 	}
 
 	return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
@@ -770,7 +703,6 @@ async function storePrefs() {
 		showToast("Username can't be longer than 15 chars");
 		return false;
 	}
-	localPrefs.user.username = usernameEl.value;
 
 	const passwordEl = document.getElementById("password");
 	// Password complexity check for user password
@@ -779,7 +711,6 @@ async function storePrefs() {
 		showToast("Password must be at least 8 characters.");
 		return false;
 	}
-	if (passwordEl.value !== localPrefs.user.password) changePass(passwordEl.value);
 
 	["videoInputDevice", "audioInputDevice", "audioOutputDevice"].forEach((id) => {
 		localPrefs.devices[id] = HarmonyUtils.getSelectedDevice(id, localPrefs.devices[id + "s"]);
@@ -790,9 +721,46 @@ async function storePrefs() {
 	});
 	localPrefs.audio.enableNoiseSuppression = getChk("enableNoiseSuppression");
 
-	window.electronAPI.updatePrefs(localPrefs);
-	window.electronAPI.loadPrefs(localPrefs);
-	return true;
+	//if user or pass changed, let server know
+	if (localPrefs.user.password != passwordEl.value || localPrefs.user.username != usernameEl.value) {
+		let newPass = passwordEl.value;
+		if (newPass === "" || newPass === null || newPass === undefined) {
+			//if no new pass, use old one
+			if (isPasswordComplex(localPrefs.user.password)) {
+				newPass = localPrefs.user.password;
+			} else {
+				//localprefs pass is somehow invalid, probably bug or user being a dingus
+				showToast("Current password is invalid, please set a new one");
+				return;
+			}
+		}
+		let newSecret = await hashbrown(`${selfId}:${newPass}`);
+		rtc.socket.emit(
+			"setUser",
+			{
+				id: selfId,
+				name: usernameEl.value,
+				secret: newSecret,
+			},
+			(res) => {
+				if (res.success) {
+					localPrefs.user.username = usernameEl.value;
+					localPrefs.user.password = newPass;
+					window.electronAPI.updatePrefs(localPrefs);
+					window.electronAPI.loadPrefs(localPrefs);
+					return true;
+				} else {
+					showToast("Failed to update: " + res.error);
+					return false;
+				}
+			}
+		);
+	} else {
+		//no user or pass change, just update local prefs
+		window.electronAPI.updatePrefs(localPrefs);
+		window.electronAPI.loadPrefs(localPrefs);
+		return true;
+	}
 }
 
 function manageVoiceUser(e) {
@@ -874,7 +842,7 @@ function manageVoiceUser(e) {
 	// Add friend logic
 	const addBtn = popup.querySelector("#addFriendVoiceBtn");
 	addBtn.onclick = () => {
-		sendFriendReq(userId);
+		FriendsManager.sendFriendReq(userId);
 		popup.remove();
 	};
 
@@ -983,17 +951,17 @@ function manageChatUser(msgEl) {
 	if (isFriend) {
 		const removeBtn = popup.querySelector("#removeFriendChatBtn");
 		removeBtn.onclick = () => {
-			// Remove friend from localPrefs
-			localPrefs.friends = localPrefs.friends.filter((f) => f.id !== userId);
-			window.electronAPI.updatePrefs(localPrefs);
-			showToast("Removed Friend");
+			FriendsManager.removeFriend(userId, () => {
+				showToast(`Removed ${username} from friends`);
+			});
+			// Remove the popup and refresh friends list
 			popup.remove();
-			showFriends();
+			FriendsManager.showFriends();
 		};
 	} else {
 		const addBtn = popup.querySelector("#addFriendChatBtn");
 		addBtn.onclick = () => {
-			sendFriendReq(userId);
+			FriendsManager.sendFriendReq(userId);
 			popup.remove();
 		};
 	}
@@ -1230,13 +1198,26 @@ class FriendsManager {
 	}
 
 	static showFriendRequests() {
+		//if selectedServer is not "HARMONY-FRIENDS-LIST", select it first
+		if (selectedServer !== "HARMONY-FRIENDS-LIST") {
+			const friendsListBtn = document.querySelector('.server-item[name="HARMONY-FRIENDS-LIST"]');
+			if (friendsListBtn) {
+				friendsListBtn.dispatchEvent(new Event("click", { bubbles: true }));
+			}
+		}
+		// Remove 'selected' class from all friend items except the clicked one
+		document.querySelectorAll(".friend-item.selected").forEach((item) => {
+			item.classList.remove("selected");
+		});
 		HarmonyUtils.removeClassFromAll(".friends-menu-item > i", "active");
 		document.getElementById("friendRequestsViewBtn").classList.add("active");
 		const friendsContainer = document.getElementById("friends");
 		HarmonyUtils.removeAllChildren(friendsContainer, ".friend-item", "friends-header");
 		HarmonyUtils.removeAllChildren(friendsContainer, ".friend-request-item");
 
-		const requests = Array.isArray(friendReqs.incoming) ? friendReqs.incoming : [];
+		var requests = Array.isArray(friendReqs.incoming) ? friendReqs.incoming : [];
+		//filter removal requests
+		requests = requests.filter((r) => r.status !== "remove");
 		if (requests.length === 0) {
 			const noReq = document.createElement("div");
 			noReq.className = "friend-request-item";
@@ -1267,8 +1248,8 @@ class FriendsManager {
 					id: req.from,
 					chat: req.chat,
 				});
+				showToast(`${DOMPurify.sanitize(req.fromName)} Is Now Your Friend!`);
 				window.electronAPI.updatePrefs(localPrefs);
-				showToast(`${DOMPurify(req.fromName)} Is Now Your Friend!`);
 			};
 			reqDiv.querySelector(".reject-friend-request").onclick = () => {
 				req.status = "rejected";
@@ -1280,14 +1261,15 @@ class FriendsManager {
 			friendsContainer.appendChild(reqDiv);
 		});
 
-		const outgoingReqs = Array.isArray(friendReqs.outgoing) ? friendReqs.outgoing : [];
+		var outgoingReqs = Array.isArray(friendReqs.outgoing) ? friendReqs.outgoing : [];
+
+		outgoingReqs = outgoingReqs.filter((r) => r.status !== "remove");
 		if (outgoingReqs.length > 0) {
 			const outgoingDiv = document.createElement("div");
 			outgoingDiv.className = "friend-request-item has-background-grey-dark has-text-white";
 			outgoingDiv.textContent = "Outgoing Friend Requests";
 			friendsContainer.appendChild(outgoingDiv);
 		}
-
 		outgoingReqs.forEach((req) => {
 			const reqDiv = document.createElement("div");
 			reqDiv.className = "friend-request-item";
@@ -1316,21 +1298,202 @@ class FriendsManager {
 
 		if (localPrefs && Array.isArray(localPrefs.friends)) {
 			HarmonyUtils.populateFriendsList(friendsContainer, localPrefs.friends, FriendsManager.selectFriend);
+			//add selected class to the first friend or selectedFriend
+			if (selectedFriend) {
+				const selectedDiv = friendsContainer.querySelector(`.friend-item[name="${selectedFriend}"]`);
+				selectedDiv.dispatchEvent(new Event("click", { bubbles: true }));
+			} else if (friendsContainer.firstChild) {
+				friendsContainer.firstChild.dispatchEvent(new Event("click", { bubbles: true }));
+			}
+		}
+	}
+
+	static sendFriendReq(userId) {
+		if (localPrefs.friends.filter((f) => f.id == userId).length > 0) {
+			//already friends
+			showToast("Already Friends With This User");
+			return;
+		}
+		if (friendReqs.outgoing.filter((r) => r.to == userId).length > 0) {
+			//already sent req
+			showToast("Already Sent Request");
+			return;
+		}
+		if (userId == selfId) {
+			//can't send friend request to self
+			showToast("You ur own best fran og");
+			return;
+		}
+		const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+		if (!uuidv4Regex.test(userId)) {
+			showToast("Invalid User ID (must be UUIDv4)");
+			return;
+		}
+
+		console.log("sending fr for ", userId);
+		//update ui for loading
+		socket.emit("friendRequest", userId, (data) => {
+			if (data.status == "add") {
+				console.log(data);
+				//check if we already have this request
+				let existingReq = friendReqs.outgoing.filter((r) => r.to == userId);
+				if (existingReq.length == 0) {
+					friendReqs.outgoing.push(data);
+				} else {
+					console.warn("Already have this request");
+				}
+			}
+		});
+		closeModals();
+		showToast("Sent Friend Request");
+		document.getElementById("friendIdInput").value = "";
+	}
+
+	//ran once on startup to check for friend requests, also registers socket listeners
+	static checkFriendReqs() {
+		socket.on("friendRequestResponse", (request) => {
+			if (request.from != selfId) {
+				//got a response from a request we did not send, probably a cancellation
+				if (request.status == "cancelled" && request.to == selfId) {
+					//remove from incoming
+					friendReqs.incoming = friendReqs.incoming.filter((r) => r.chat != request.chat && r.from != request.from);
+					//update ui
+					let reqDiv = document.querySelector(`.friend-request-item[reqFrom="${request.from}"]`);
+					if (reqDiv) {
+						reqDiv.remove();
+					}
+				}
+				return;
+			}
+			//else outgoing req
+			if (request.status == "accepted") {
+				localPrefs.friends.push({
+					name: request.toName,
+					id: request.to,
+					chat: request.chat,
+				});
+				window.electronAPI.updatePrefs(localPrefs);
+				showToast(`${DOMPurify.sanitize(request.toName)} Is Now Your Friend!`);
+			} else {
+			}
+			//update friend requests
+			let reqDiv = document.querySelector(`.friend-request-item[reqTo="${request.to}"]`);
+			if (reqDiv) {
+				reqDiv.remove();
+			}
+			//remove our acked friend request from friendReqs.outgoing
+			if (friendReqs.outgoing) {
+				friendReqs.outgoing = friendReqs.outgoing.filter((r) => r.to != request.to);
+			}
+		});
+
+		socket.on("friendRequest", (request) => {
+			//got a friend request
+			console.log("got friend request", request);
+			if (request.from != selfId && request.to == selfId) {
+				// check if status = remove
+				if (request.status === "remove") {
+					// Remove from local friends and ack removal
+					this.removeFriend(request.from);
+					// Remove from incoming requests
+					friendReqs.incoming = friendReqs.incoming.filter((r) => r.from != request.from);
+					return;
+				}
+
+				//add to global friendReqs.incoming
+				if (!friendReqs.incoming) friendReqs.incoming = [];
+				//check if we already have this request
+				let existingReq = friendReqs.incoming.filter((r) => r.from == request.from);
+				if (existingReq.length == 0) {
+					friendReqs.incoming.push(request);
+				} else {
+					console.warn("Already have this request");
+					return;
+				}
+				showToast(`${DOMPurify.sanitize(request.fromName)} Sent You a Friend Request`, this.showFriendRequests);
+			}
+		});
+
+		socket.on("friendRemove", (request) => {
+			//got a friend removal request
+			console.log("got friend removal request", request);
+			if (request.from != selfId && request.to == selfId) {
+				// Remove from local friends and ack removal
+				this.removeFriend(request.from);
+				// Remove from incoming requests
+				friendReqs.incoming = friendReqs.incoming.filter((r) => r.from != request.from);
+			}
+		});
+
+		socket.emit("checkFriendReqs", ({ incoming, outgoing }) => {
+			console.log(incoming, outgoing);
+			//if any incoming request is a removal, run removeFriend on it
+			incoming = incoming.filter((r) => {
+				if (r.status === "remove") {
+					this.removeFriend(r.from);
+					return false; // filter out removal requests
+				}
+				return true; // keep other requests
+			});
+			outgoing = outgoing.filter((r) => {
+				if (r.status === "remove") {
+					// Remove from outgoing requests
+					return false; // filter out removal requests
+				}
+				return true; // keep other requests
+			});
+			//store to global friendReqs
+			friendReqs.incoming = incoming;
+			friendReqs.outgoing = outgoing;
+		});
+	}
+
+	//removes friend from local and emits to server to either ack or send removal
+	static removeFriend(userId, callback = null) {
+		if (!userId || userId === selfId) {
+			console.warn("Failed to remove friend: Invalid user ID to remove.");
+			return;
+		}
+
+		const friendIndex = localPrefs.friends.findIndex((f) => f.id === userId);
+		if (friendIndex === -1) {
+			console.warn("Failed to remove friend: Friend not found.");
+			//maybe already removed? lets ack
+			socket.emit("removeFriend", userId, (res) => {
+				if (res.ack) {
+					if (typeof callback === "function") callback();
+				}
+			});
+			return;
+		}
+
+		const friend = localPrefs.friends[friendIndex];
+		localPrefs.friends.splice(friendIndex, 1);
+		window.electronAPI.updatePrefs(localPrefs);
+
+		socket.emit("removeFriend", userId, (res) => {
+			if (res.success) {
+				if (typeof callback === "function") callback();
+			} else {
+				showToast(`Failed to remove friend: ${res.error}`);
+			}
+		});
+	}
+}
+
+// Load userCache from localStorage on startup
+function loadUserCache() {
+	try {
+		const stored = localStorage.getItem("userCache");
+		userCache = stored ? JSON.parse(stored) : {};
+	} catch (e) {
+		if ((Object.keys(userCache).length = 0)) {
+			userCache = {};
 		}
 	}
 }
 
-// Load userColors from localStorage on startup
-function loadUserColors() {
-	try {
-		const stored = localStorage.getItem("userColors");
-		userColors = stored ? JSON.parse(stored) : {};
-	} catch (e) {
-		userColors = {};
-	}
-}
-
-// Save userColors to localStorage only if dirty
-function saveUsers() {
-	localStorage.setItem("userColors", JSON.stringify(userColors));
+// Save userCache to localStorage only if dirty
+function saveUserCache() {
+	localStorage.setItem("userCache", JSON.stringify(userCache));
 }

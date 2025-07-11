@@ -47,6 +47,8 @@ class rtcInterface {
 				return;
 			}
 			data.peers.forEach((peerId) => {
+				//if not in global userCache, emit to server to get username
+				checkUserCache(peerId);
 				if (type == "voice") {
 					this.startVoiceConnection(peerId);
 				} else if (type == "chat") {
@@ -66,6 +68,10 @@ class rtcInterface {
 		this.socket.on("peerJoin", (data) => {
 			const newPeer = data.from;
 			console.log(`${newPeer} joined channel ${data.channel}`);
+
+			//if not in global userCache, emit to server to get username
+			checkUserCache(newPeer);
+
 			//add channel to peer
 			this.peerChannels[newPeer] = this.peerChannels[newPeer] || [];
 			if (!this.peerChannels[newPeer].includes(data.channel)) {
@@ -208,25 +214,15 @@ class rtcInterface {
 			this.unProcessedLocalAudio = null;
 		}
 	}
-
 	VoiceHangup() {
 		this.stopLocalVoice();
 		if (this.mediaChannel) {
 			this.leaveChannel(this.mediaChannel);
 		} else {
 			console.warn("attempted to hang up vc with no set mediaChannel");
+			return;
 		}
-		//remove all remoteaudio streams
-		Object.keys(this.peerConnections).forEach((peerId) => {
-			if (this.remoteAudioStreams[peerId]) {
-				this.remoteAudioStreams[peerId].getTracks().forEach((track) => {
-					track.stop();
-				});
-				this.remoteAudioStreams[peerId] = null;
-				delete this.remoteAudioStreams[peerId];
-			}
-		});
-		this.remoteAudioStreams = {};
+
 		if (this.ring) {
 			this.voiceRingEnd(); //stop ring if we are ending it early
 			this.ring = null;
@@ -234,15 +230,7 @@ class rtcInterface {
 		removeVoiceUser(selfId);
 		setVoiceUIState("idle");
 		//send courtesy dataChannel message to remove yourself for any chat only peers
-		const msg = {
-			timestamp: Date.now(),
-			user: selfId,
-			content: "",
-			channel: this.mediaChannel,
-			type: "voiceLeave",
-		};
-		console.log(`Sending voiceLeave on ${this.mediaChannel}`);
-		this.sendMessage(msg, setChannelType(this.mediaChannel, "chat"));
+
 		//check if currentChat != our chat converted mediachannel (viewing diff channel then on vc with)
 		if (currentChat != setChannelType(this.mediaChannel, "chat")) {
 			//if so we should clear vc and see if anyone is in the currentchats vc
@@ -299,6 +287,30 @@ class rtcInterface {
 		if (this.ring && this.ring.type == "incoming voice") {
 			//stop any existing incoming ring
 			this.voiceRingEnd();
+			//switch ui to view the channel we are joining
+			if (setChannelType(currentChat, "voice") != channel) {
+				//if we are not in the channel we are joining, switch to it
+				const server = (localPrefs.servers || []).find((s) => s.secret === channel.split(":")[1]);
+				const friend = (localPrefs.friends || []).find((f) => f.chat === channel.split(":")[1]);
+				if (server) {
+					const serverElem = document.querySelector(`.server-item[name="${server.id}"]`);
+					if (serverElem) {
+						serverElem.click();
+					} else {
+						console.error("Could not find server that user is being called on", server);
+					}
+				} else if (friend) {
+					const friendElem = document.querySelector(`.friend-item[name="${friend.id}"]`);
+					if (friendElem) {
+						FriendsManager.selectFriend(friendElem);
+					} else {
+						console.error("Could not find friend that is calling user", friend.id);
+					}
+				} else {
+					this.VoiceHangup();
+					console.error("Could not find server or friend for channel", channel);
+				}
+			}
 		}
 		//change color of call button and stop anims
 		setVoiceUIState("inCall", channel);
@@ -472,12 +484,42 @@ class rtcInterface {
 
 	leaveChannel(channel) {
 		const [type] = channel ? channel.split(":") : [null];
-		if (this.localAudioStream && type == "voice") {
-			this.localAudioStream.getTracks().forEach((track) => {
-				track.stop();
-			});
-			this.localAudioStream = null;
+		if (type == "voice" && this.mediaChannel == channel) {
+			if (this.localAudioStream) {
+				//stop local audio
+				this.localAudioStream.getTracks().forEach((track) => {
+					track.stop();
+				});
+				this.localAudioStream = null;
+			}
+			if (this.remoteAudioStreams) {
+				//remove all remoteaudio streams
+				Object.keys(this.peerConnections).forEach((peerId) => {
+					if (this.remoteAudioStreams[peerId]) {
+						this.remoteAudioStreams[peerId].getTracks().forEach((track) => {
+							track.stop();
+						});
+						this.remoteAudioStreams[peerId] = null;
+						delete this.remoteAudioStreams[peerId];
+					}
+				});
+				this.remoteAudioStreams = {};
+			}
+
+			const msg = {
+				timestamp: Date.now(),
+				user: selfId,
+				content: "",
+				channel: this.mediaChannel,
+				type: "voiceLeave",
+			};
+
+			removeVoiceUser(selfId);
+			setVoiceUIState("idle");
+			console.log(`Sending voiceLeave on ${this.mediaChannel}`);
+			this.sendMessage(msg, setChannelType(this.mediaChannel, "chat"));
 		}
+
 		this.socket.emit("leaveChannel", channel);
 		console.log("broadcast leaveChannel on ", channel);
 	}
@@ -888,7 +930,12 @@ function setVoiceUIState(state, id = "") {
 	switch (state) {
 		case "ringing":
 			mute.classList.remove("is-hidden");
-			vcEl.classList.add("ringing", "pickup");
+			vcEl.classList.add("ringing");
+			if (rtc.ring.type == "incoming voice") {
+				// If incoming ring, add pickup hover
+				vcEl.classList.add("pickup");
+			}
+
 			list.classList.add("ringing");
 			if (idEl) {
 				if (idEl) {
@@ -1004,5 +1051,22 @@ function removeVoiceUser(userId) {
 	const voiceUser = document.getElementById(userId);
 	if (voiceUser && voiceUser.parentNode) {
 		voiceUser.parentNode.removeChild(voiceUser);
+	}
+}
+
+function checkUserCache(userId) {
+	if (!userCache[userId] || (userCache[userId] && userCache[userId].timestamp < Date.now() - userCacheTTL)) {
+		userCache[userId] = "";
+		this.socket.emit("getUsername", userId, (username) => {
+			if (username) {
+				userCache[userId] = { name: username, timestamp: Date.now() };
+				// Save the updated cache to local storage
+				saveUserCache();
+				console.log(`Cached username for ${userId}: ${username}`);
+			} else {
+				console.warn(`Server did not have username for: ${userId}`);
+				userCache[userId] = null;
+			}
+		});
 	}
 }

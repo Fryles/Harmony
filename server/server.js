@@ -7,6 +7,9 @@ import sirv from "sirv";
 import { JSONFilePreset } from "lowdb/node";
 import crypto from "crypto";
 import { instrument } from "@socket.io/admin-ui";
+import { JSDOM } from "jsdom";
+import DOMPurify from "dompurify";
+
 // ENVIRONMENT VARIABLES
 const PORT = process.env.PORT || 3000;
 
@@ -38,21 +41,25 @@ const pepper = Math.round(Math.random() * 420);
 console.log("pepper: ", pepper);
 const addServerThrottle = {};
 const addUserThrottle = {};
+const window = new JSDOM("").window;
+const purify = DOMPurify(window);
 
 // AUTHENTICATION MIDDLEWARE
 io.use(async (socket, next) => {
 	const userId = socket.handshake.auth.userId;
 	// Validate userId is a valid UUID (v4)
-	const uuidV4Regex =
-		/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+	const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 	if (!uuidV4Regex.test(userId)) {
 		return next(new Error("Invalid userId: must be a valid UUID v4"));
 	}
 	//try session first
 	if (db.data.users[userId] && socket.handshake.auth.session) {
-		if (db.data.users[userId].session === socket.handshake.auth.session) {
-			//good session auth
-			//TODO: Check session timestamp to see if session expired
+		if (
+			db.data.users[userId].session === socket.handshake.auth.session &&
+			db.data.users[userId].sessionTimestamp &&
+			Date.now() - db.data.users[userId].sessionTimestamp < 24 * 60 * 60 * 1000
+		) {
+			//good auth and session timestamp is within 24 hours
 			console.log("client logged in with session token");
 			return next();
 		} else {
@@ -85,17 +92,16 @@ io.use(async (socket, next) => {
 		addUserThrottle[ip] = addUserThrottle[ip].filter((ts) => now - ts < DAY);
 		if (addUserThrottle[ip].length >= 4) {
 			console.log("Account creation limit reached for IP:", ip);
-			let err = new Error(
-				"Account creation limit reached for this IP. Try again later."
-			);
-			err.message =
-				"Account creation limit reached for this IP. Try again later.";
+			let err = new Error("Account creation limit reached for this IP. Try again later.");
+			err.message = "Account creation limit reached for this IP. Try again later.";
 			return next(err);
 		}
 		addUserThrottle[ip].push(now);
 
 		//TODO add username validation
-		const userName = socket.handshake.auth.userName;
+		let userName = socket.handshake.auth.userName;
+		// Sanitize username
+		userName = purify.sanitize(userName);
 
 		//no user for this id, registering and giving token
 		await db.update(
@@ -119,14 +125,15 @@ io.use(async (socket, next) => {
 
 // API ENDPOINT TO DISPLAY THE CONNECTION TO THE SIGNALING SERVER
 let connections = {};
-app.get("/connections", (req, res) => {
-	res.json(Object.values(connections));
-});
+// app.get("/connections", (req, res) => {
+// 	res.json(Object.values(connections));
+// });
 
 // MESSAGING LOGIC
 io.on("connection", (socket) => {
 	console.log("User connected with id", socket.id);
 
+	// Handles client ready event, adds peer to connections and sends session token
 	socket.on("ready", () => {
 		const peerId = socket.handshake.auth.userId;
 
@@ -138,15 +145,11 @@ io.on("connection", (socket) => {
 			}
 			console.log(`Added ${peerId} to connections`);
 
+			// Send session token to the peer
 			socket.send({
 				from: "server",
 				target: peerId,
 				session: db.data.users[peerId].session,
-				payload: {
-					action: "open",
-					connections: Object.values(connections),
-					bePolite: false,
-				},
 			});
 
 			// Create new peer
@@ -154,20 +157,13 @@ io.on("connection", (socket) => {
 			// Updates connections object
 			connections[peerId] = newPeer;
 			// Let all other peers know about new peer
-			socket.broadcast.emit("message", {
-				from: peerId,
-				target: "all",
-				payload: { action: "open", connections: [newPeer], bePolite: true },
-			});
-			// send connections object with an array containing the only new peer and make all exisiting peers polite.
 		}
 	});
 
+	// Handles joining a channel, notifies peers and sends welcome info
 	socket.on("joinChannel", (chnl, old) => {
 		if (old) {
-			console.log(
-				`${socket.handshake.auth.userId} leaving ${old} and joining ${chnl}`
-			);
+			console.log(`${socket.handshake.auth.userId} leaving ${old} and joining ${chnl}`);
 			socket.leave(old);
 		} else {
 			console.log(`${socket.handshake.auth.userId} joining ${chnl}`);
@@ -196,6 +192,7 @@ io.on("connection", (socket) => {
 		});
 	});
 
+	// Returns all peerIds in a channel via callback
 	socket.on("channelQuery", (chnl, callback) => {
 		//get all peers on this voice channel and pass to callback
 		//TODO this should probably have some throttle
@@ -207,9 +204,7 @@ io.on("connection", (socket) => {
 			// Map socket ids to peerIds
 			const peerIds = Array.from(clients)
 				.map((socketId) => {
-					const entry = Object.entries(connections).find(
-						([peerId, conn]) => conn.socketId === socketId
-					);
+					const entry = Object.entries(connections).find(([peerId, conn]) => conn.socketId === socketId);
 					return entry ? entry[0] : null;
 				})
 				.filter(Boolean);
@@ -217,6 +212,7 @@ io.on("connection", (socket) => {
 		}
 	});
 
+	// Handles leaving a channel, notifies peers
 	socket.on("leaveChannel", (chnl) => {
 		console.log(`${socket.handshake.auth.userId} leaving channel ${chnl}`);
 		const leftPeer = socket.handshake.auth.userId;
@@ -229,6 +225,7 @@ io.on("connection", (socket) => {
 		});
 	});
 
+	// Relays a message to a peer in a channel
 	socket.on("message", (channel, peerId, message) => {
 		// Check if the target peer is in the channel before sending the message
 		const targetPeer = connections[peerId];
@@ -245,31 +242,11 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	socket.on("directMessage", (message) => {
-		// Send message to a specific targeted peer
-		if (message === null || message === undefined) {
-			console.log(`Bad dm message`);
-		}
-		const { target } = message.to;
-		const targetPeer = connections[target];
-		if (targetPeer) {
-			io.to(targetPeer.socketId).emit("message", { ...message });
-		} else {
-			console.log(`Target ${target} not found`);
-		}
-	});
-
+	// Handles peer disconnect, notifies channels and removes from connections
 	socket.on("disconnect", () => {
-		const disconnectingPeer = Object.values(connections).find(
-			(peer) => peer.socketId === socket.id
-		);
+		const disconnectingPeer = Object.values(connections).find((peer) => peer.socketId === socket.id);
 		if (disconnectingPeer) {
-			console.log(
-				"Disconnected",
-				socket.id,
-				"with peerId",
-				disconnectingPeer.peerId
-			);
+			console.log("Disconnected", socket.id, "with peerId", disconnectingPeer.peerId);
 
 			// Emit peerLeave for each channel the peer is part of
 			const socketRooms = socket.rooms;
@@ -300,29 +277,39 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	//friend requests are tracked with 5 statuses:
-	//awaiting - first pushed to server
-	//cancelled - the sender has cancelled the request, req can be deleted
-	//accepted - the reciever has accepted the request
-	//rejected - the reciever has denied the request
-	//recieved - the sender has acked the response - req can be deleted
+	//friend requests are defined with 6 statuses:
+	// add - sender requests to add friend
+	// remove - sender requests removal of friend
+	// cancelled - the sender has cancelled the request, req should be deleted
 
+	// accepted - the reciever has accepted the request
+	// rejected - the reciever has denied the request
+
+	// recieved - the sender has acked the response - req should be deleted
+
+	// Handles sending a friend request to another user
 	socket.on("friendRequest", async (friend, callback) => {
 		//validate friend is not imaginary
-		const uuidV4Regex =
-			/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+		const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 		if (!uuidV4Regex.test(friend)) {
 			if (callback) callback({ success: false, error: "Invalid userId" });
 			return;
 		}
 		if (!db.data.users[friend]) {
-			if (callback)
-				callback({ success: false, error: "UserId does not exist" });
+			if (callback) callback({ success: false, error: "UserId does not exist" });
 			return;
 		}
 
 		const userId = socket.handshake.auth.userId;
 		const requests = db.data.requests;
+
+		//check for removal request, if found, remove
+		const removalIdx = requests.findIndex((r) => r.from === userId && r.to === friend && r.status === "remove");
+		if (removalIdx !== -1) {
+			//we have a removal request, so lets remove it before continuing
+			requests.splice(removalIdx, 1);
+			await db.write();
+		}
 
 		// Check for existing outgoing request
 		const outgoing = requests.find((r) => r.to === friend && r.from === userId);
@@ -332,9 +319,7 @@ io.on("connection", (socket) => {
 		}
 
 		// Check for incoming request (reverse)
-		const incomingIdx = requests.findIndex(
-			(r) => r.to === userId && r.from === friend
-		);
+		const incomingIdx = requests.findIndex((r) => r.to === userId && r.from === friend);
 		if (requests[incomingIdx]) {
 			// we already have a request for us :D
 			db.data.requests[incomingIdx].status = "accepted";
@@ -342,10 +327,7 @@ io.on("connection", (socket) => {
 			// Emit friendRequestResponse to both peers if possible
 			const toPeer = connections[friend];
 			if (toPeer) {
-				io.to(toPeer.socketId).emit(
-					"friendRequestResponse",
-					db.data.requests[incomingIdx]
-				);
+				io.to(toPeer.socketId).emit("friendRequestResponse", db.data.requests[incomingIdx]);
 				db.data.requests[incomingIdx].status = "recieved";
 			}
 			//respond with accepted req
@@ -357,12 +339,12 @@ io.on("connection", (socket) => {
 		// No outgoing or incoming, create new request
 		const fr = {
 			from: userId,
-			fromName: db.data.users[userId].name,
+			fromName: purify.sanitize(db.data.users[userId].name),
 			to: friend,
-			toName: db.data.users[friend].name,
+			toName: purify.sanitize(db.data.users[friend].name),
 			chat: crypto.randomBytes(24).toString("hex"),
 			time: Date.now(),
-			status: "awaiting",
+			status: "add",
 		};
 
 		db.data.requests.push(fr);
@@ -376,12 +358,11 @@ io.on("connection", (socket) => {
 		}
 	});
 
+	// Handles response to a friend request (accept/reject)
 	socket.on("friendRequestResponse", async (req) => {
 		const userId = socket.handshake.auth.userId;
 		const requests = db.data.requests;
-		const idx = requests.findIndex(
-			(r) => r.from === req.from && r.to === userId
-		);
+		const idx = requests.findIndex((r) => r.from === req.from && r.to === userId);
 		if (idx !== -1) {
 			if (req.status === "accepted") {
 				requests[idx].status = "accepted";
@@ -409,16 +390,83 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	socket.on("friendRemove", async (callback) => {});
+	// Cancels a pending friend request
+	socket.on("cancelFriendRequest", async (req) => {
+		const userId = socket.handshake.auth.userId;
+		const requests = db.data.requests;
+		const idx = requests.findIndex(
+			(r) => r.from === userId && r.to === req.to && r.chat === req.chat && r.status === "add"
+		);
+		if (idx !== -1) {
+			requests.splice(idx, 1);
+			await db.write();
+			// Emit friendRequestCancelled to the target peer if possible
+			const toPeer = connections[req.to];
+			if (toPeer) {
+				req.status = "cancelled";
+				io.to(toPeer.socketId).emit("friendRequestResponse", req);
+			}
+		} else {
+			console.log("Request not found or already accepted/rejected");
+		}
+	});
 
+	// Removes a friend from the user's friend list, and acks a removal request if it exists
+	socket.on("removeFriend", async (friend, callback) => {
+		const userId = socket.handshake.auth.userId;
+		if (!db.data.users[friend]) {
+			if (callback) callback({ success: false, error: "UserId does not exist" });
+			return;
+		}
+		const requests = db.data.requests;
+
+		// Check we have an existing request to remove already out
+		const idx = requests.findIndex((r) => r.from === userId && r.to === friend && r.status === "remove");
+		if (idx !== -1) {
+			// If there is an existing request to remove, do nothing
+			if (callback) callback({ success: false, error: "Request to remove friend already exists" });
+			return;
+		}
+		// check if we are acking a removal request
+		const ackIdx = requests.findIndex((r) => r.from === friend && r.to === userId && r.status === "remove");
+		if (ackIdx !== -1) {
+			// If we are acking a removal request, remove it
+			const ackRequest = requests[ackIdx];
+			requests.splice(ackIdx, 1);
+			await db.write();
+
+			if (callback) callback({ success: true, request: ackRequest });
+
+			return;
+		}
+
+		// Create a new request to remove friend
+		const fr = {
+			from: userId,
+			fromName: purify.sanitize(db.data.users[userId].name),
+			to: friend,
+			toName: purify.sanitize(db.data.users[friend].name),
+			time: Date.now(),
+			status: "remove",
+		};
+
+		requests.push(fr);
+		await db.write();
+		if (callback) callback({ success: true, request: fr });
+
+		// Emit friendRemove to the target peer if possible
+		const toPeer = connections[friend];
+		if (toPeer) {
+			io.to(toPeer.socketId).emit("friendRemove", fr);
+		}
+		console.log(`Friend request to remove ${friend} sent from ${userId}`);
+	});
+
+	// Checks incoming and outgoing friend requests for the user
 	socket.on("checkFriendReqs", async (callback) => {
 		const userId = socket.handshake.auth.userId;
-		const incoming = db.data.requests.filter(
-			(r) => r.to === userId && r.status != "recieved"
-		);
-		const outgoing = db.data.requests.filter(
-			(r) => r.from === userId && r.status != "recieved"
-		);
+		const incoming = db.data.requests.filter((r) => r.to === userId && r.status != "recieved");
+		const outgoing = db.data.requests.filter((r) => r.from === userId && r.status != "recieved");
 
 		//since we are sending client their outgoing requests, any accepted/rejected should be updated to recieved
 		let updated = false;
@@ -434,14 +482,10 @@ io.on("connection", (socket) => {
 		callback({ incoming, outgoing });
 	});
 
+	// Authenticates a server using name, id, and secret
 	socket.on("serverAuth", async (name, id, secret, callback) => {
 		const servers = db.data.servers || {};
-		if (
-			callback &&
-			servers[name] &&
-			servers[name].id === id &&
-			servers[name].secret === secret
-		) {
+		if (callback && servers[name] && servers[name].id === id && servers[name].secret === secret) {
 			//good auth
 			callback(servers[name]);
 		} else {
@@ -450,6 +494,7 @@ io.on("connection", (socket) => {
 		}
 	});
 
+	// Queries servers by name, returns matches via callback
 	socket.on("serverQuery", async (name, exact, callback) => {
 		if (!name) {
 			if (callback) callback([]);
@@ -469,9 +514,7 @@ io.on("connection", (socket) => {
 			}
 		} else {
 			name = name.toLowerCase();
-			matches = Object.values(servers).filter((s) =>
-				s.name.toLowerCase().includes(name)
-			);
+			matches = Object.values(servers).filter((s) => s.name.toLowerCase().includes(name));
 			//filter matches to only open servers
 			matches = matches.filter((s) => {
 				if (!s.options.serverUnlisted) {
@@ -486,6 +529,7 @@ io.on("connection", (socket) => {
 		if (callback) callback(matches);
 	});
 
+	// Registers a new server with provided details
 	socket.on("registerServer", async (server, callback) => {
 		const userId = socket.handshake.auth.userId;
 		const now = Date.now();
@@ -503,20 +547,16 @@ io.on("connection", (socket) => {
 		}
 
 		//takes name, id, secret, and options object
-		const uuidV4Regex =
-			/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+		const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 		const id = server?.id;
 		let name = server?.name;
+		// Sanitize server name
+		name = purify.sanitize(name);
 		if (!id || !uuidV4Regex.test(id)) {
 			if (callback) callback({ success: false, error: "Invalid server id" });
 			return;
 		}
-		if (
-			!name ||
-			typeof name !== "string" ||
-			name.length > 32 ||
-			name.length < 3
-		) {
+		if (!name || typeof name !== "string" || name.length > 32 || name.length < 3) {
 			if (callback) callback({ success: false, error: "Invalid server name" });
 			return;
 		}
@@ -537,8 +577,7 @@ io.on("connection", (socket) => {
 
 		// Check if server id already exists
 		if (db.data.servers[name]) {
-			if (callback)
-				callback({ success: false, error: "Server name already exists" });
+			if (callback) callback({ success: false, error: "Server name already exists" });
 			return;
 		}
 
@@ -561,46 +600,134 @@ io.on("connection", (socket) => {
 		if (callback) callback({ success: true, server: safeServer });
 	});
 
-	socket.on("cancelFriendRequest", async (req) => {
-		const userId = socket.handshake.auth.userId;
-		const requests = db.data.requests;
-		const idx = requests.findIndex(
-			(r) =>
-				r.from === userId &&
-				r.to === req.to &&
-				r.chat === req.chat &&
-				r.status === "awaiting"
-		);
-		if (idx !== -1) {
-			requests.splice(idx, 1);
-			await db.write();
-			// Emit friendRequestCancelled to the target peer if possible
-			const toPeer = connections[req.to];
-			if (toPeer) {
-				req.status = "cancelled";
-				io.to(toPeer.socketId).emit("friendRequestResponse", req);
-			}
-		} else {
-			console.log("Request not found or already accepted/rejected");
-		}
-	});
-
-	socket.on("changePass", async (newSecret, callback) => {
-		const userId = socket.handshake.auth.userId;
-		const oldSecret = socket.handshake.auth.secret;
-		const user = db.data.users[userId];
+	// Set user name/password
+	socket.on("setUser", async (userPrefs, callback) => {
+		const socketUserId = socket.handshake.auth.userId;
+		const socketSecret = socket.handshake.auth.secret;
+		const user = db.data.users[userPrefs.id];
+		const userId = userPrefs.id;
 		if (!user) {
 			if (callback) callback({ success: false, error: "User not found" });
 			return;
 		}
-		if (user.secret !== oldSecret) {
-			if (callback) callback({ success: false, error: "Secret incorrect" });
+		//ensure socket user is updating their own user and has correct secret
+		if (userId !== socketUserId || user.secret !== socketSecret) {
+			console.log(userId, socketUserId, user.secret, socketSecret);
+
+			if (callback) callback({ success: false, error: "Bad auth silly" });
 			return;
 		}
+		//update info
+
 		await db.update(({ users }) => {
-			users[userId].secret = newSecret;
+			users[userId].secret = userPrefs.secret || user.secret; // allow updating secret
+			// Sanitize name before updating
+			users[userId].name = userPrefs.name ? purify.sanitize(userPrefs.name) : user.name;
 		});
 		if (callback) callback({ success: true });
+	});
+
+	// gets username by userId
+	socket.on("getUsername", (userId, callback) => {
+		if (!userId || !db.data.users[userId]) {
+			if (callback) callback(false);
+			return;
+		}
+		const user = db.data.users[userId];
+		if (callback) callback(user.name);
+	});
+
+	// Stores a message in the server's message history
+	socket.on("serverMessage", async (serverId, message, callback) => {
+		const userId = socket.handshake.auth.userId;
+		if (!userId || !db.data.users[userId]) {
+			if (callback) callback({ success: false, error: "User not authenticated" });
+			return;
+		}
+		if (callback && typeof callback !== "function") {
+			console.error("Callback must be a function");
+			return;
+		}
+		// Validate serverId and message
+		if (!serverId || typeof serverId !== "string") {
+			if (callback) callback({ success: false, error: "Invalid server id" });
+			return;
+		}
+		const servers = db.data.servers || {};
+		const server = Object.values(servers).find((s) => s.id === serverId);
+		if (!server) {
+			if (callback) callback({ success: false, error: "Server not found" });
+			return;
+		}
+		// make sure user is in the channel
+		if (!socket.rooms.has("chat:" + server.secret)) {
+			if (callback)
+				callback({
+					success: false,
+					error: "User not in server channel",
+				});
+			return;
+		}
+		if (!server.options?.serverStoredMessaging) {
+			if (callback) callback({ success: false, error: "Server does not support stored messaging" });
+			return;
+		}
+		// Basic message validation
+		if (
+			!message ||
+			typeof message !== "object" ||
+			typeof message.content !== "string" ||
+			message.content.length === 0 ||
+			message.type !== "text" ||
+			message.content.length > 1000 ||
+			!message.content.trim()
+		) {
+			if (callback) callback({ success: false, error: "Invalid message" });
+			return;
+		}
+
+		// Sanitize message content
+		const sanitizedContent = purify.sanitize(message.content);
+
+		// Remove channel before storing message
+		const { channel, ...messageWithoutChannel } = message;
+		messageWithoutChannel.content = sanitizedContent;
+		server.messages.push(messageWithoutChannel);
+		await db.write();
+
+		if (callback) callback({ success: true });
+	});
+
+	// Retrieves server messages after a given timestamp
+	socket.on("getServerMessages", async (serverId, since, callback) => {
+		const userId = socket.handshake.auth.userId;
+		if (!userId || !db.data.users[userId]) {
+			if (callback) callback({ success: false, error: "User not authenticated" });
+			return;
+		}
+		const servers = db.data.servers || {};
+		const server = Object.values(servers).find((s) => s.id === serverId);
+		if (!server) {
+			if (callback) callback({ success: false, error: "Server not found" });
+			return;
+		}
+		// make sure user is in the channel
+		if (!socket.rooms.has("chat:" + server.secret)) {
+			if (callback)
+				callback({
+					success: false,
+					error: "User not in server channel",
+				});
+			return;
+		}
+		if (!server.options?.serverStoredMessaging) {
+			if (callback) callback({ success: false, error: "Server does not support stored messaging" });
+			return;
+		}
+		const sinceTimestamp = Number(since) || 0;
+		const messages = (server.messages || []).filter((msg) => msg.timestamp && msg.timestamp > sinceTimestamp);
+
+		if (callback) callback({ success: true, messages: messages });
 	});
 });
 
@@ -611,11 +738,12 @@ app.use(sirv("public"));
 server.listen(PORT, console.log(`Listening on PORT ${PORT}`));
 
 //util for fake server id to avoid exposing unlisted servers when running exact server query
+// basitly it maps a server name to unique id that cannot be guessed
 function generateUuidBySeed(seedString) {
 	//add per server session salt to hash to stop guessing of fake uuids
 	seedString = `${seedString}${pepper}`;
 	//Enumerating unlisted servers is still possible between server restarts
-	//TODO make pepper a ENV maybe
+	//TODO make pepper a ENV maybe??
 	const hash = crypto.createHash("sha256").update(seedString).digest("hex");
 
 	// UUID version 4 consists of 32 hexadecimal digits in the form:

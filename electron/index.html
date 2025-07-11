@@ -71,10 +71,10 @@
           </h2>
           <div class="no-fire"
             style="display: flex; flex-direction: row; align-items: center;justify-content: space-around; width: 8em;">
-            <span class="icon friends-menu-item"><i id="friendsViewBtn" onclick="showFriends()"
+            <span class="icon friends-menu-item"><i id="friendsViewBtn" onclick="FriendsManager.showFriends()"
                 class="fas fa-lg fa-user-group active"></i></span>
-            <span class="icon friends-menu-item"><i id="friendRequestsViewBtn" onclick="showFriendRequests()"
-                class="fas fa-lg fa-envelope-open-text"></i></span>
+            <span class="icon friends-menu-item"><i id="friendRequestsViewBtn"
+                onclick="FriendsManager.showFriendRequests()" class="fas fa-lg fa-envelope-open-text"></i></span>
 
             <span class="icon friends-menu-item modal-button" data-target="friendreq-modal"><i id="addFriendBtn"
                 class="fas fa-lg fa-user-plus"></i></span>
@@ -204,7 +204,7 @@
         <div class="field">
           <label class="label">Name</label>
           <div class="control">
-            <input class="input" type="text" id="friendNameInput" placeholder="Enter friend's name">
+            <input class="input" type="text" id="friendNameInput" placeholder="" disabled>
           </div>
         </div>
       </section>
