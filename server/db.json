@@ -2,16 +2,16 @@
   "requests": [],
   "users": {
     "f842a398-9470-4644-8165-64aad570267f": {
-      "name": "matchamatcha",
+      "name": "matchamatchamatrcha",
       "secret": "b2fe6cd46334bdada6e231e3db867463bd8e79f5ffb9b3f0fb0a0961f4d2ad57",
-      "session": "2603e8662e1256f9da18231a6976f707",
-      "sessionTimestamp": 1752266036246
+      "session": "d020da946b0d9646750abd5d9b64e597",
+      "sessionTimestamp": 1752526965819
     },
     "a268f8bb-a15a-48cc-90fd-f92642f41b95": {
-      "name": "magentas",
+      "name": "magenter",
       "secret": "f86fd27c170cbe8f67f5ece71cd059b5176f709ba1c262fda61ccfc5017429da",
-      "session": "825469ac58519780bd9e51dc4bc78df1",
-      "sessionTimestamp": 1752266043882
+      "session": "4b7d56f3c14eda6a2f1acb40ea3addb2",
+      "sessionTimestamp": 1752527245323
     }
   },
   "ips": {},
@@ -185,6 +185,14 @@
           "content": "work",
           "type": "text",
           "color": "#db4dcd"
+        },
+        {
+          "timestamp": 1752523790706,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "magenter",
+          "content": "asd",
+          "type": "text",
+          "color": "#db4dcd"
         }
       ]
     },
@@ -356,6 +364,46 @@
           "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
           "username": "magenta",
           "content": "test",
+          "type": "text",
+          "color": "#db4dcd"
+        },
+        {
+          "timestamp": 1752523536561,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "magenter",
+          "content": "tesing lol",
+          "type": "text",
+          "color": "#db4dcd"
+        },
+        {
+          "timestamp": 1752523540490,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "matchamatchamatrcha",
+          "content": "work",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752523828757,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "matchamatchamatrcha",
+          "content": "dd",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752523835078,
+          "user": "f842a398-9470-4644-8165-64aad570267f",
+          "username": "matchamatchamatrcha",
+          "content": "asdasd",
+          "type": "text",
+          "color": "#0cdbab"
+        },
+        {
+          "timestamp": 1752523887093,
+          "user": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+          "username": "magenter",
+          "content": "dd",
           "type": "text",
           "color": "#db4dcd"
         }

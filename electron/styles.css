@@ -39,6 +39,22 @@ html {
 	scrollbar-color: var(--bulma-grey-dark) transparent;
 }
 
+.unselectable {
+	-moz-user-select: -moz-none;
+	-khtml-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+.selectable {
+	-moz-user-select: -moz-text;
+	-khtml-user-select: text;
+	-webkit-user-select: text;
+	-ms-user-select: text;
+	user-select: text;
+}
+
 .left-bar {
 	width: 70px;
 	display: flex;

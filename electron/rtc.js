@@ -666,7 +666,7 @@ class rtcInterface {
 					//special param for starting vc, display ring/video ui
 					break;
 				default:
-					window.rcvChat(event, peerId);
+					chatManager.rcvChat(event, peerId);
 					break;
 			}
 		};

@@ -97,11 +97,15 @@ io.use(async (socket, next) => {
 			return next(err);
 		}
 		addUserThrottle[ip].push(now);
-
-		//TODO add username validation
+		console.log("client registering new user with id", userId);
 		let userName = socket.handshake.auth.userName;
 		// Sanitize username
 		userName = purify.sanitize(userName);
+		if (!userName || typeof userName !== "string" || userName.length > 32 || userName.length < 3) {
+			let err = new Error("Invalid username");
+			err.message = "Invalid username: must be a string between 3 and 32 characters";
+			return next(err);
+		}
 
 		//no user for this id, registering and giving token
 		await db.update(
@@ -123,7 +127,6 @@ io.use(async (socket, next) => {
 	}
 });
 
-// API ENDPOINT TO DISPLAY THE CONNECTION TO THE SIGNALING SERVER
 let connections = {};
 // app.get("/connections", (req, res) => {
 // 	res.json(Object.values(connections));
@@ -277,15 +280,12 @@ io.on("connection", (socket) => {
 		}
 	});
 
-	//friend requests are defined with 6 statuses:
+	//friend requests are defined with 5 statuses:
 	// add - sender requests to add friend
 	// remove - sender requests removal of friend
 	// cancelled - the sender has cancelled the request, req should be deleted
-
 	// accepted - the reciever has accepted the request
 	// rejected - the reciever has denied the request
-
-	// recieved - the sender has acked the response - req should be deleted
 
 	// Handles sending a friend request to another user
 	socket.on("friendRequest", async (friend, callback) => {
@@ -318,20 +318,19 @@ io.on("connection", (socket) => {
 			return;
 		}
 
-		// Check for incoming request (reverse)
+		// Check if friend already sent us a request
 		const incomingIdx = requests.findIndex((r) => r.to === userId && r.from === friend);
 		if (requests[incomingIdx]) {
 			// we already have a request for us :D
 			db.data.requests[incomingIdx].status = "accepted";
-
-			// Emit friendRequestResponse to both peers if possible
+			//respond to socket with accepted req
+			socket.emit("friendRequestResponse", db.data.requests[incomingIdx]);
+			// Emit friendRequestResponse to other peer if possible
 			const toPeer = connections[friend];
 			if (toPeer) {
 				io.to(toPeer.socketId).emit("friendRequestResponse", db.data.requests[incomingIdx]);
 				db.data.requests[incomingIdx].status = "recieved";
 			}
-			//respond with accepted req
-			socket.emit("friendRequestResponse", db.data.requests[incomingIdx]);
 			await db.write();
 			return;
 		}
@@ -465,21 +464,17 @@ io.on("connection", (socket) => {
 	// Checks incoming and outgoing friend requests for the user
 	socket.on("checkFriendReqs", async (callback) => {
 		const userId = socket.handshake.auth.userId;
-		const incoming = db.data.requests.filter((r) => r.to === userId && r.status != "recieved");
+		const incoming = db.data.requests.filter(
+			(r) => r.to === userId && r.status != "recieved" && r.status != "accepted" && r.status != "rejected"
+		);
 		const outgoing = db.data.requests.filter((r) => r.from === userId && r.status != "recieved");
 
-		//since we are sending client their outgoing requests, any accepted/rejected should be updated to recieved
-		let updated = false;
-		for (const req of outgoing) {
-			if (req.status === "accepted" || req.status === "rejected") {
-				req.status = "BUHHUG";
-				updated = true;
-			}
-		}
-		if (updated) {
-			await db.write();
-		}
 		callback({ incoming, outgoing });
+
+		//remove any outgoing requests that are accepted or rejected (they are now acked)
+		db.data.requests = db.data.requests.filter((r) => r.status !== "accepted" && r.status !== "rejected");
+		//set status to "recieved" for future implementation of scheduled deletes
+		await db.write();
 	});
 
 	// Authenticates a server using name, id, and secret
@@ -496,7 +491,7 @@ io.on("connection", (socket) => {
 
 	// Queries servers by name, returns matches via callback
 	socket.on("serverQuery", async (name, exact, callback) => {
-		if (!name) {
+		if (!name || !name.trim()) {
 			if (callback) callback([]);
 			return;
 		}
@@ -514,7 +509,14 @@ io.on("connection", (socket) => {
 			}
 		} else {
 			name = name.toLowerCase();
-			matches = Object.values(servers).filter((s) => s.name.toLowerCase().includes(name));
+			//search based on contains, w/ and w/o spaces
+			matches = Object.values(servers).filter(
+				(s) =>
+					s.name.toLowerCase().includes(name) ||
+					s.name.toLowerCase().replace(/\s/g, "").includes(name) ||
+					s.name.toLowerCase().includes(name.replace(/\s/g, "")) ||
+					s.name.toLowerCase().replace(/\s/g, "").includes(name.replace(/\s/g, ""))
+			);
 			//filter matches to only open servers
 			matches = matches.filter((s) => {
 				if (!s.options.serverUnlisted) {
@@ -550,8 +552,9 @@ io.on("connection", (socket) => {
 		const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 		const id = server?.id;
 		let name = server?.name;
-		// Sanitize server name
+		// Sanitize and trim server name
 		name = purify.sanitize(name);
+		name = name.trim();
 		if (!id || !uuidV4Regex.test(id)) {
 			if (callback) callback({ success: false, error: "Invalid server id" });
 			return;
@@ -560,23 +563,8 @@ io.on("connection", (socket) => {
 			if (callback) callback({ success: false, error: "Invalid server name" });
 			return;
 		}
-		// Sanitize name: trim, collapse spaces, limit length, remove special chars/emojis/accented chars
-		name = name
-			.normalize("NFD") // decompose accented chars
-			.replace(/[\u0300-\u036f]/g, "") // remove accents
-			.replace(/[^\x20-\x7E]/g, "") // remove non-ASCII (emojis, symbols)
-			.replace(/[^a-zA-Z0-9 ]/g, "") // remove special chars except space
-			.trim()
-			.replace(/\s+/g, " ")
-			.slice(0, 32);
-
-		if (name.length === 0 || name.length > 32 || name.length < 3) {
-			if (callback) callback({ success: false, error: "Invalid server name" });
-			return;
-		}
-
-		// Check if server id already exists
-		if (db.data.servers[name]) {
+		// Check if server name already exists in any capitalization
+		if (Object.values(db.data.servers || {}).some((s) => s.name.toLowerCase() === name.toLowerCase())) {
 			if (callback) callback({ success: false, error: "Server name already exists" });
 			return;
 		}

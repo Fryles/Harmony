@@ -40,27 +40,6 @@ window.addEventListener("DOMContentLoaded", async () => {
 	}
 });
 
-function loadFriends(prefs) {
-	// Clear all children except #friends-header
-	const friendsContainer = document.getElementById("friends");
-	if (friendsContainer) {
-		Array.from(friendsContainer.children).forEach((child) => {
-			if (child.id !== "friends-header") {
-				friendsContainer.removeChild(child);
-			}
-		});
-	}
-
-	let friends = prefs.friends;
-	friends.forEach((friend) => {
-		let el = document.createElement("div");
-		el.classList.add("friend-item");
-		el.setAttribute("name", friend.id);
-		el.innerHTML = friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name;
-		document.getElementById("friends").appendChild(el);
-	});
-}
-
 function loadServers(prefs) {
 	// Only keep the friends button in the server list
 	const serverList = document.getElementById("server-list");
@@ -156,7 +135,6 @@ function loadPrefs(prefs) {
 	document.head.appendChild(customStyles);
 	loadSettings(prefs);
 	loadServers(prefs);
-	loadFriends(prefs);
 }
 
 function loadSettings(prefs) {
@@ -288,7 +266,7 @@ function populateDeviceDropdown(selectId, devices, selectedDevice) {
 function psuedoUser(userId) {
 	//if we cant find a username, we give a unique readable one based on uuuid
 	var prefixes = [
-		"Cool",
+		"Bigbacked",
 		"Epic",
 		"Funky",
 		"Sneaky",
@@ -305,12 +283,7 @@ function psuedoUser(userId) {
 		"Radical",
 		"Bizarre",
 		"Cosmic",
-		"Tiny",
-		"Giga",
 		"Sleepy",
-		"Noisy",
-		"Silent",
-		"Cheesy",
 		"Cranky",
 		"Jumpy",
 		"Loopy",

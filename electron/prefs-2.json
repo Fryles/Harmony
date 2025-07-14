@@ -1,6 +1,6 @@
 {
   "user": {
-    "username": "matchamatcha",
+    "username": "matchamatchamatrcha",
     "userId": "f842a398-9470-4644-8165-64aad570267f",
     "password": "12345678"
   },
@@ -40,9 +40,9 @@
   },
   "friends": [
     {
-      "name": "magentas",
+      "name": "magenter",
       "id": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
-      "chat": "31c161718c90483c5ca089ef70b92409f4985b5a2441b0c3"
+      "chat": "64133918c65e77cc558bd0ed593a3c18ed4f39e39499f286"
     }
   ],
   "devices": {

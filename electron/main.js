@@ -2,8 +2,12 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const fs = require("fs");
 const path = require("path");
-// Enable live reload for all the files inside your project directory
-require("electron-reload")(__dirname);
+// Enable live reload for all the files except prefs*.json
+
+require("electron-reload")(__dirname, {
+	electron: require(`${__dirname}/node_modules/electron`),
+	ignored: /(^[\/\\]\.|[\/\\]prefs.*\.json$|[\/\\]node_modules[\/\\]|[\/\\]dist[\/\\]|[\/\\]src[\/\\]$)/,
+});
 
 function createWindow() {
 	// Create the browser window.

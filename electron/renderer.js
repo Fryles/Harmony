@@ -27,7 +27,6 @@ async function init() {
 
 	await webSocketInit();
 	rtc = new rtcInterface();
-	FriendsManager.checkFriendReqs();
 	if (!localPrefs.user.password) {
 		//bro what
 		alert("idk how but u never set a password. please set one");
@@ -186,7 +185,7 @@ async function init() {
 					}
 					serverResponse.messages.forEach((msg) => {
 						msg.channel = `chat:${server.secret}`;
-						storeChat(msg);
+						chatManager.storeChat(msg);
 					});
 				});
 			}
@@ -198,7 +197,9 @@ async function init() {
 		localStorage.setItem("lastOnline", Date.now());
 	}, 20 * 1000); // 20 seconds
 
-	//poll server for our friends to see if there are any updates
+	//check friend reqs
+	FriendsManager.showFriends();
+	FriendsManager.checkFriendReqs();
 }
 
 async function webSocketInit() {
@@ -236,13 +237,8 @@ async function webSocketInit() {
 	this.socket.emit("ready");
 }
 
-function isPasswordComplex(pwd) {
-	// At least 8 chars
-	return typeof pwd === "string" && pwd.length >= 8;
-}
-
 async function registerServer() {
-	let name = document.getElementById("serverNameInput").value;
+	let name = DOMPurify.sanitize(document.getElementById("serverNameInput").value);
 	let pwd = document.getElementById("serverPasswordInput").value;
 	let id = crypto.randomUUID();
 
@@ -254,13 +250,13 @@ async function registerServer() {
 		serverUnlisted: document.getElementById("serverUnlisted").checked,
 		serverStoredMessaging: document.getElementById("serverStoredMessaging").checked,
 	};
-	if ((pwd === "" || !pwd) && !options.serverOpen) {
+	if ((pwd === "" || !pwd || pwd.trim() === "") && !options.serverOpen) {
 		//empty pwd with non-open server
 		showToast("A Closed Server Must Have a Password");
 		return;
 	}
 	// Password complexity check for closed servers
-	if (!options.serverOpen && !isPasswordComplex(pwd)) {
+	if (!options.serverOpen && !HarmonyUtils.isPasswordComplex(pwd)) {
 		showToast("Password must be at least 8 characters.");
 		return;
 	}
@@ -320,14 +316,21 @@ async function registerServer() {
 function addServer() {
 	const name = document.getElementById("joinServerNameInput").value;
 	const pwd = document.getElementById("joinServerPasswordInput").value;
+	if (!name || name.trim() === "") {
+		showToast("Server name cannot be empty.");
+		return;
+	}
 
 	//query server exact to get id (could be real or fake)
 	socket.emit("serverQuery", name, true, async (res) => {
 		res = res[0];
+		if (!res.id) {
+			showToast(`Failed to join ${name}`, null, "is-danger");
+		}
 		const secret = await hashbrown(`server:${res.id}:${pwd}`);
 		socket.emit("serverAuth", name, res.id, secret, (res) => {
 			if (res) {
-				// Add server to prefs and update
+				// good auth, add server to prefs
 				if (!localPrefs.servers) localPrefs.servers = [];
 				localPrefs.servers.push(res);
 				// Add server to UI before the "Add Server" button
@@ -353,232 +356,23 @@ function addServer() {
 						serverList.appendChild(serverDiv);
 					}
 				}
-				showToast(`Joined ${DOMPurify.sanitize(res.name)}`);
+				showToast(`Joined ${DOMPurify.sanitize(res.name)}`, () => {
+					const serverItem = document.querySelector(`.server-item[name="${res.id}"]`);
+					if (serverItem) {
+						serverItem.dispatchEvent(new Event("click", { bubbles: true }));
+					}
+				});
+				// Update prefs and close modal
 				closeModals();
 				window.electronAPI.updatePrefs(localPrefs);
 			} else {
-				showToast(`Failed to join ${name}`);
+				showToast(`Failed to join ${name}`, null, "is-danger");
 			}
 		});
 	});
 }
 
-function sendChat(content) {
-	const sanitizedContent = DOMPurify.sanitize(content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, ""));
-	if (!sanitizedContent || sanitizedContent.trim() === "" || sanitizedContent.length > 1000) {
-		showToast("Invalid message content. Must be non-empty and less than 1000 characters.");
-		return;
-	}
-	//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM CURRENTCHAT
-	const msg = {
-		timestamp: Date.now(),
-		user: selfId,
-		username: localPrefs.user.username,
-		content: sanitizedContent,
-		channel: currentChat,
-		type: "text",
-		color: localPrefs.settings.accentColor,
-	};
-	updateChat(msg);
-	storeChat(msg);
-	rtc.sendMessage(msg, currentChat);
-
-	// Check if currentChat is a server chat and if serverStoredMessaging is enabled
-	let server = null;
-	if (currentChat) {
-		const secret = currentChat.split(":")[1];
-		server = localPrefs.servers && localPrefs.servers.find((s) => s.secret === secret);
-	}
-	if (server && server.options && server.options.serverStoredMessaging) {
-		socket.emit("serverMessage", server.id, msg, (serverResponse) => {
-			if (serverResponse.success) {
-				console.log("Message stored on server:", serverResponse);
-			} else {
-				console.error("Failed to store message on server:", serverResponse.error);
-			}
-		});
-	}
-}
-
-function rcvChat(msg) {
-	channel = msg.channel;
-
-	// Track user data
-	if (msg.user && msg.username) {
-		if (userCache[msg.user].name !== msg.username) {
-			userCache[msg.user].name = msg.username;
-			saveUserCache();
-		}
-		// If msg.user is in our friends, update prefs with new user name
-		if (localPrefs.friends) {
-			const friend = localPrefs.friends.find((f) => f.id === msg.user);
-			if (friend && msg.username && friend.name !== msg.username) {
-				friend.name = msg.username;
-				window.electronAPI.updatePrefs(localPrefs);
-			}
-		}
-	}
-
-	if (channel == currentChat) {
-		updateChat(msg);
-	} else {
-		const server = localPrefs.servers.find((s) => s.secret === channel.split(":")[1]);
-		const user = userLookup(msg.user);
-		if (server) {
-			showToast(
-				`${user.nick ? user.nick : user.name} sent you a message on ${server.name}`,
-				() => {
-					const sovoBtn = document.querySelector(`.server-item[name="${server.id}"]`);
-					if (sovoBtn) {
-						sovoBtn.dispatchEvent(new Event("click", { bubbles: true }));
-					}
-				},
-				msg.color ? msg.color : "is-primary"
-			);
-		} else {
-			showToast(
-				`${user.nick ? user.nick : user.name} sent you a message`,
-				() => {
-					if (selectedServer != "HARMONY-FRIENDS-LIST") {
-						//select friends server, then friend itself
-						const friendsListBtn = document.querySelector('.server-item[name="HARMONY-FRIENDS-LIST"]');
-						if (friendsListBtn) {
-							friendsListBtn.dispatchEvent(new Event("click", { bubbles: true }));
-						}
-						// Find the friend and select them
-						const friend = localPrefs.friends.find((f) => f.id === msg.user);
-						if (friend) {
-							const friendDiv = document.getElementsByName(friend.id)[0];
-							if (friendDiv) {
-								friendDiv.dispatchEvent(new Event("click", { bubbles: true }));
-							}
-						}
-					}
-				},
-				msg.color ? msg.color : "is-primary"
-			);
-		}
-	}
-	storeChat(msg);
-}
-
-function displayChat(chatId) {
-	if (!chatId) {
-		document.getElementById("chat-messages").innerHTML = "";
-		return;
-	}
-	if (currentChat == chatId) {
-		return;
-	}
-	//get serverId from chatId
-	//get messages from browser
-	if (!chatId.startsWith("chat:")) {
-		currentChat = `chat:${chatId}`;
-	} else {
-		currentChat = chatId;
-	}
-	var messages = [];
-	try {
-		const existing = localStorage.getItem(currentChat);
-		if (existing) {
-			messages = JSON.parse(existing);
-		}
-	} catch (e) {
-		console.error("Failed to parse chat history:", e);
-		messages = [];
-	}
-	//clear chat and set all messages (horrible TODO)
-	document.getElementById("chat-messages").innerHTML = "";
-	messages.forEach((msg) => {
-		updateChat(msg);
-	});
-	//connect to chat rtc
-	// rtc.joinChannel(currentChat);
-}
-
-function updateChat(msg) {
-	//add msg to chat
-	if (!msg || !msg.user || !msg.content) {
-		showToast("Bad message!");
-		return;
-	}
-	// Remove all id attributes and sanitize from msg.content
-	const sanitizedContent = DOMPurify.sanitize(msg.content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, ""));
-	let el = document.createElement("p");
-	let un = document.createElement("span");
-	un.className = "tag";
-	if (msg.color) {
-		un.style.backgroundColor = msg.color;
-		un.style.color = HarmonyUtils.getBestTextColor(msg.color);
-	} else if (msg.user == selfId) {
-		un.classList.add("is-primary");
-	}
-	if (msg.user == selfId) {
-		el.style = "text-align: end;";
-	}
-
-	let username = msg.username;
-	let sender = userLookup(msg.user);
-	// if (username) {
-	// 	sender.name = username;
-	// }
-	un.innerText = DOMPurify.sanitize(
-		sender.nick != "" && sender.nick != undefined ? `${sender.nick} (${sender.name})` : sender.name
-	);
-	un.setAttribute("data-user-id", msg.user);
-	un.setAttribute("data-timestamp", msg.timestamp);
-
-	el.appendChild(un);
-	el.appendChild(document.createElement("br"));
-	el.appendChild(document.createTextNode(sanitizedContent));
-
-	if (msg.user != selfId) {
-		// Add click handler to open user popup
-		un.classList.add("is-clickable");
-		un.addEventListener("click", function (e) {
-			e.stopPropagation();
-			manageChatUser(un);
-		});
-	}
-
-	document.getElementById("chat-messages").appendChild(el);
-	// Auto-scroll to bottom
-	const chatMessages = document.getElementById("chat-messages");
-	chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-function storeChat(msg) {
-	//TODO THIS IS KINDA BLOATED
-	//adds message to respective chat and stores it
-	const key = msg.channel;
-	let messages = [];
-	try {
-		const existing = localStorage.getItem(key);
-		if (existing) {
-			messages = JSON.parse(existing);
-		}
-	} catch (e) {
-		console.error("Failed to parse chat history:", e);
-		messages = [];
-	}
-	messages.push(msg);
-	//sort by timestamp
-	messages.sort((a, b) => a.timestamp - b.timestamp);
-
-	//filter dups (can occur with multiple windows/instances)
-	messages = messages.filter(
-		(m, i, arr) =>
-			arr.findIndex((x) => x.timestamp === m.timestamp && x.user === m.user && x.content === m.content) === i
-	);
-
-	//constrain to less than localprefs maxMsgHistory
-	if (localPrefs && messages.length > localPrefs.settings.maxMsgHistory) {
-		messages = messages.slice(-localPrefs.settings.maxMsgHistory);
-	}
-
-	localStorage.setItem(key, JSON.stringify(messages));
-}
-
+// Handles clicks on server icons
 async function selectServerItem(e) {
 	//stop icons from tweaking out
 	if (e.target.tagName.toLowerCase() != "div") {
@@ -612,16 +406,17 @@ async function selectServerItem(e) {
 	const chatEl = document.getElementById("chat");
 	var chat;
 	if (selectedServer == "HARMONY-FRIENDS-LIST") {
+		FriendsManager.showFriends();
 		friendsEl.classList.remove("slide-away");
 		chatEl.classList.remove("expand");
 
 		let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
 		if (privFriend && privFriend.chat) {
 			chat = privFriend.chat;
-			displayChat(chat);
+			chatManager.displayChat(chat);
 		} else {
 			//no friend chat to display, show empty chat
-			displayChat(null);
+			chatManager.displayChat(null);
 			console.log("Error finding friend chat for ", selectedFriend);
 		}
 	} else {
@@ -631,10 +426,10 @@ async function selectServerItem(e) {
 		let privServer = localPrefs.servers.find((f) => f.id == selectedServer);
 		if (privServer && privServer.secret !== null && privServer.secret !== undefined) {
 			chat = privServer.secret;
-			displayChat(chat);
+			chatManager.displayChat(chat);
 		} else {
 			//no server chat to display, show empty chat
-			displayChat(null);
+			chatManager.displayChat(null);
 			console.log("Error finding server chat for ", selectedServer);
 		}
 	}
@@ -657,6 +452,7 @@ async function selectServerItem(e) {
 	}
 }
 
+// Returns user object with name and nick for given userId
 function userLookup(userId) {
 	if (userId === selfId) {
 		return { name: localPrefs.user.username, nick: "" };
@@ -677,6 +473,7 @@ function userLookup(userId) {
 	return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 }
 
+// Validates then saves preferences to local and server for user/pass
 async function storePrefs() {
 	localPrefs = await window.electronAPI.getPrefs();
 	const getVal = (id) => document.getElementById(id).value;
@@ -706,7 +503,10 @@ async function storePrefs() {
 
 	const passwordEl = document.getElementById("password");
 	// Password complexity check for user password
-	if (!passwordEl.value || (passwordEl.value !== localPrefs.user.password && !isPasswordComplex(passwordEl.value))) {
+	if (
+		!passwordEl.value ||
+		(passwordEl.value !== localPrefs.user.password && !HarmonyUtils.isPasswordComplex(passwordEl.value))
+	) {
 		validateField(passwordEl);
 		showToast("Password must be at least 8 characters.");
 		return false;
@@ -726,7 +526,7 @@ async function storePrefs() {
 		let newPass = passwordEl.value;
 		if (newPass === "" || newPass === null || newPass === undefined) {
 			//if no new pass, use old one
-			if (isPasswordComplex(localPrefs.user.password)) {
+			if (HarmonyUtils.isPasswordComplex(localPrefs.user.password)) {
 				newPass = localPrefs.user.password;
 			} else {
 				//localprefs pass is somehow invalid, probably bug or user being a dingus
@@ -1027,54 +827,6 @@ function closeModals() {
 	}
 }
 
-// Utility class for helper functions
-class HarmonyUtils {
-	static removeClassFromAll(selector, className) {
-		document.querySelectorAll(selector).forEach((el) => el.classList.remove(className));
-	}
-
-	static removeAllChildren(parent, selector, exceptId) {
-		parent.querySelectorAll(selector).forEach((item) => {
-			if (!exceptId || item.id !== exceptId) item.remove();
-		});
-	}
-
-	static populateFriendsList(container, friends, clickHandler) {
-		friends.forEach((friend) => {
-			const friendDiv = document.createElement("div");
-			friendDiv.className = "friend-item";
-			friendDiv.setAttribute("name", DOMPurify.sanitize(friend.id));
-			friendDiv.textContent = DOMPurify.sanitize(friend.nick ? `${friend.nick} (${friend.name})` : friend.name);
-			friendDiv.addEventListener("click", FriendsManager.selectFriend, true);
-			container.appendChild(friendDiv);
-		});
-	}
-
-	static getSelectedDevice(selectId, devices) {
-		const select = document.getElementById(selectId);
-		const deviceId = select.value;
-		return devices.find((d) => d.deviceId === deviceId) || null;
-	}
-
-	static getBestTextColor(hexColor) {
-		const hex = hexColor.replace(/^#/, "");
-		let r, g, b;
-		if (hex.length === 3) {
-			r = parseInt(hex[0] + hex[0], 16);
-			g = parseInt(hex[1] + hex[1], 16);
-			b = parseInt(hex[2] + hex[2], 16);
-		} else if (hex.length === 6) {
-			r = parseInt(hex.substring(0, 2), 16);
-			g = parseInt(hex.substring(2, 4), 16);
-			b = parseInt(hex.substring(4, 6), 16);
-		} else {
-			return "#000000";
-		}
-		const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-		return luminance > 0.5 ? "#000000" : "#ffffff";
-	}
-}
-
 function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 	const toast = document.createElement("div");
 	// If color is a hex code, set background color directly, else add as class
@@ -1159,6 +911,59 @@ function showToast(msg, onclick, color = "is-primary", timeout = 5000) {
 	}, timeout);
 }
 
+// Utility class for helper functions
+class HarmonyUtils {
+	static isPasswordComplex(pwd) {
+		// At least 8 chars
+		return typeof pwd === "string" && pwd.length >= 8;
+	}
+
+	static removeClassFromAll(selector, className) {
+		document.querySelectorAll(selector).forEach((el) => el.classList.remove(className));
+	}
+
+	static removeAllChildren(parent, selector, exceptId) {
+		parent.querySelectorAll(selector).forEach((item) => {
+			if (!exceptId || item.id !== exceptId) item.remove();
+		});
+	}
+
+	static populateFriendsList(container, friends, clickHandler) {
+		friends.forEach((friend) => {
+			const friendDiv = document.createElement("div");
+			friendDiv.className = "friend-item";
+			friendDiv.setAttribute("name", DOMPurify.sanitize(friend.id));
+			friendDiv.textContent = DOMPurify.sanitize(friend.nick ? `${friend.nick} (${friend.name})` : friend.name);
+			friendDiv.addEventListener("click", FriendsManager.selectFriend, true);
+			container.appendChild(friendDiv);
+		});
+	}
+
+	static getSelectedDevice(selectId, devices) {
+		const select = document.getElementById(selectId);
+		const deviceId = select.value;
+		return devices.find((d) => d.deviceId === deviceId) || null;
+	}
+
+	static getBestTextColor(hexColor) {
+		const hex = hexColor.replace(/^#/, "");
+		let r, g, b;
+		if (hex.length === 3) {
+			r = parseInt(hex[0] + hex[0], 16);
+			g = parseInt(hex[1] + hex[1], 16);
+			b = parseInt(hex[2] + hex[2], 16);
+		} else if (hex.length === 6) {
+			r = parseInt(hex.substring(0, 2), 16);
+			g = parseInt(hex.substring(2, 4), 16);
+			b = parseInt(hex.substring(4, 6), 16);
+		} else {
+			return "#000000";
+		}
+		const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+		return luminance > 0.5 ? "#000000" : "#ffffff";
+	}
+}
+
 // FriendsManager class for all friends-related logic
 class FriendsManager {
 	static selectFriend(e) {
@@ -1191,7 +996,7 @@ class FriendsManager {
 		selectedFriend = el.getAttribute("name");
 		let privFriend = localPrefs.friends.find((f) => f.id == selectedFriend);
 		if (privFriend && privFriend.chat) {
-			displayChat(privFriend.chat);
+			chatManager.displayChat(privFriend.chat);
 		} else {
 			console.log("Error finding friend chat for ", selectedFriend);
 		}
@@ -1248,7 +1053,7 @@ class FriendsManager {
 					id: req.from,
 					chat: req.chat,
 				});
-				showToast(`${DOMPurify.sanitize(req.fromName)} Is Now Your Friend!`);
+				showToast(`${DOMPurify.sanitize(req.fromName)} Is Now Your Friend!`, FriendsManager.showFriends);
 				window.electronAPI.updatePrefs(localPrefs);
 			};
 			reqDiv.querySelector(".reject-friend-request").onclick = () => {
@@ -1299,8 +1104,9 @@ class FriendsManager {
 		if (localPrefs && Array.isArray(localPrefs.friends)) {
 			HarmonyUtils.populateFriendsList(friendsContainer, localPrefs.friends, FriendsManager.selectFriend);
 			//add selected class to the first friend or selectedFriend
-			if (selectedFriend) {
-				const selectedDiv = friendsContainer.querySelector(`.friend-item[name="${selectedFriend}"]`);
+
+			const selectedDiv = friendsContainer.querySelector(`.friend-item[name="${selectedFriend}"]`);
+			if (selectedFriend && selectedDiv) {
 				selectedDiv.dispatchEvent(new Event("click", { bubbles: true }));
 			} else if (friendsContainer.firstChild) {
 				friendsContainer.firstChild.dispatchEvent(new Event("click", { bubbles: true }));
@@ -1427,6 +1233,28 @@ class FriendsManager {
 
 		socket.emit("checkFriendReqs", ({ incoming, outgoing }) => {
 			console.log(incoming, outgoing);
+
+			// if any accepted outgoing requests are not in localPrefs.friends, add them
+			outgoing.forEach((req) => {
+				if (req.status === "accepted") {
+					const existingFriend = localPrefs.friends.find((f) => f.id === req.to);
+					if (!existingFriend) {
+						localPrefs.friends.push({
+							name: req.toName,
+							id: req.to,
+							chat: req.chat,
+						});
+					}
+				} else if (req.status === "rejected") {
+					// Remove from local friends if rejected (shouldnt happen)
+					localPrefs.friends = localPrefs.friends.filter((f) => f.id !== req.to);
+				}
+			});
+			//remove all reqs that were just accepted/rejected from outgoing
+			outgoing = outgoing.filter((r) => {
+				return r.status !== "accepted" && r.status !== "rejected";
+			});
+
 			//if any incoming request is a removal, run removeFriend on it
 			incoming = incoming.filter((r) => {
 				if (r.status === "remove") {
@@ -1436,12 +1264,11 @@ class FriendsManager {
 				return true; // keep other requests
 			});
 			outgoing = outgoing.filter((r) => {
-				if (r.status === "remove") {
-					// Remove from outgoing requests
-					return false; // filter out removal requests
-				}
-				return true; // keep other requests
+				return r.status !== "remove";
 			});
+
+			//update local prefs
+			window.electronAPI.updatePrefs(localPrefs);
 			//store to global friendReqs
 			friendReqs.incoming = incoming;
 			friendReqs.outgoing = outgoing;
@@ -1454,30 +1281,264 @@ class FriendsManager {
 			console.warn("Failed to remove friend: Invalid user ID to remove.");
 			return;
 		}
-
+		// Remove from localPrefs.friends
 		const friendIndex = localPrefs.friends.findIndex((f) => f.id === userId);
-		if (friendIndex === -1) {
-			console.warn("Failed to remove friend: Friend not found.");
-			//maybe already removed? lets ack
-			socket.emit("removeFriend", userId, (res) => {
-				if (res.ack) {
-					if (typeof callback === "function") callback();
-				}
-			});
-			return;
+		//update ui
+		const friendDiv = document.querySelector(`.friend-item[name="${userId}"]`);
+		if (friendDiv) {
+			friendDiv.remove();
+		} else {
+			console.warn(`Failed to remove friend: Friend not found in UI. ${userId}`);
 		}
 
-		const friend = localPrefs.friends[friendIndex];
-		localPrefs.friends.splice(friendIndex, 1);
-		window.electronAPI.updatePrefs(localPrefs);
+		// If not found, log a warning before acking the removal
+		if (friendIndex === -1) {
+			console.warn("Failed to remove friend from localprefs: Friend not found.");
+		} else {
+			localPrefs.friends.splice(friendIndex, 1);
+			window.electronAPI.updatePrefs(localPrefs);
+		}
 
 		socket.emit("removeFriend", userId, (res) => {
 			if (res.success) {
 				if (typeof callback === "function") callback();
 			} else {
-				showToast(`Failed to remove friend: ${res.error}`);
+				console.warn(`Failed to remove friend: ${res.error}`);
 			}
 		});
+	}
+}
+// Contains all methods for interacting with or managing chat functionality
+class chatManager {
+	// Sanitizes chat content and sends to peers, server (if enabled), and stores in local storage
+	static sendChat(content) {
+		const sanitizedContent = DOMPurify.sanitize(content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, ""));
+		if (!sanitizedContent || sanitizedContent.trim() === "" || sanitizedContent.length > 1000) {
+			showToast("Invalid message content. Must be non-empty and less than 1000 characters.");
+			return;
+		}
+		//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM CURRENTCHAT
+		const msg = {
+			timestamp: Date.now(),
+			user: selfId,
+			username: localPrefs.user.username,
+			content: sanitizedContent,
+			channel: currentChat,
+			type: "text",
+			color: localPrefs.settings.accentColor,
+		};
+		if (!msg || !msg.user || !msg.content) {
+			// showToast("Bad message!");
+			return;
+		}
+		this.updateChat(msg);
+		this.storeChat(msg);
+		rtc.sendMessage(msg, currentChat);
+
+		// Check if currentChat is a server chat and if serverStoredMessaging is enabled
+		let server = null;
+		if (currentChat) {
+			const secret = currentChat.split(":")[1];
+			server = localPrefs.servers && localPrefs.servers.find((s) => s.secret === secret);
+		}
+		if (server && server.options && server.options.serverStoredMessaging) {
+			socket.emit("serverMessage", server.id, msg, (serverResponse) => {
+				if (serverResponse.success) {
+					console.log("Message stored on server:", serverResponse);
+				} else {
+					console.error("Failed to store message on server:", serverResponse.error);
+				}
+			});
+		}
+	}
+
+	// Handles incoming chat messages: updates userCache if dirty, appends to UI, stores to localStorage, and shows toast if needed
+	static rcvChat(msg) {
+		let channel = msg.channel;
+
+		// Track user data
+		if (msg.user && msg.username) {
+			if (userCache[msg.user].name !== msg.username) {
+				userCache[msg.user].name = msg.username;
+				saveUserCache();
+			}
+			// If msg.user is in our friends, update prefs with new user name
+			if (localPrefs.friends) {
+				const friend = localPrefs.friends.find((f) => f.id === msg.user);
+				if (friend && msg.username && friend.name !== msg.username) {
+					friend.name = msg.username;
+					window.electronAPI.updatePrefs(localPrefs);
+				}
+			}
+		}
+
+		if (channel == currentChat) {
+			this.updateChat(msg);
+		} else {
+			const server = localPrefs.servers.find((s) => s.secret === channel.split(":")[1]);
+			const user = userLookup(msg.user);
+			if (server) {
+				showToast(
+					`${user.nick ? user.nick : user.name} sent you a message on ${server.name}`,
+					() => {
+						const sovoBtn = document.querySelector(`.server-item[name="${server.id}"]`);
+						if (sovoBtn) {
+							sovoBtn.dispatchEvent(new Event("click", { bubbles: true }));
+						}
+					},
+					msg.color ? msg.color : "is-primary"
+				);
+			} else {
+				showToast(
+					`${user.nick ? user.nick : user.name} sent you a message`,
+					() => {
+						if (selectedServer != "HARMONY-FRIENDS-LIST") {
+							//select friends server, then friend itself
+							const friendsListBtn = document.querySelector('.server-item[name="HARMONY-FRIENDS-LIST"]');
+							if (friendsListBtn) {
+								friendsListBtn.dispatchEvent(new Event("click", { bubbles: true }));
+							}
+							// Find the friend and select them
+							const friend = localPrefs.friends.find((f) => f.id === msg.user);
+							if (friend) {
+								const friendDiv = document.getElementsByName(friend.id)[0];
+								if (friendDiv) {
+									friendDiv.dispatchEvent(new Event("click", { bubbles: true }));
+								}
+							}
+						}
+					},
+					msg.color ? msg.color : "is-primary"
+				);
+			}
+		}
+		this.storeChat(msg);
+	}
+
+	// Updates main chat display with the given chatId
+	static displayChat(chatId) {
+		if (!chatId) {
+			document.getElementById("chat-messages").innerHTML = "";
+			return;
+		}
+		if (currentChat == chatId) {
+			return;
+		}
+		//get serverId from chatId
+		//get messages from browser
+		if (!chatId.startsWith("chat:")) {
+			currentChat = `chat:${chatId}`;
+		} else {
+			currentChat = chatId;
+		}
+		var messages = [];
+		try {
+			const existing = localStorage.getItem(currentChat);
+			if (existing) {
+				messages = JSON.parse(existing);
+			}
+		} catch (e) {
+			console.error("Failed to parse chat history:", e);
+			messages = [];
+		}
+		//clear chat and set all messages (horrible TODO)
+		document.getElementById("chat-messages").innerHTML = "";
+		messages.forEach((msg) => {
+			this.updateChat(msg);
+		});
+		//connect to chat rtc
+		// rtc.joinChannel(currentChat);
+	}
+
+	// Adds a message to the chat UI after sanitizing it
+	static updateChat(msg) {
+		//add msg to chat
+		if (!msg || !msg.user || !msg.content) {
+			// showToast("Bad message!");
+			return;
+		}
+		// Remove all id attributes and sanitize from msg.content
+		const sanitizedContent = DOMPurify.sanitize(msg.content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, ""));
+		let el = document.createElement("p");
+		let un = document.createElement("span");
+		un.className = "tag";
+		if (msg.color) {
+			un.style.backgroundColor = msg.color;
+			un.style.color = HarmonyUtils.getBestTextColor(msg.color);
+		} else if (msg.user == selfId) {
+			un.classList.add("is-primary");
+		}
+		if (msg.user == selfId) {
+			el.style = "text-align: end;";
+		}
+
+		let username = msg.username;
+		let sender = userLookup(msg.user);
+		// if (username) {
+		// 	sender.name = username;
+		// }
+		un.innerText = DOMPurify.sanitize(
+			sender.nick != "" && sender.nick != undefined ? `${sender.nick} (${sender.name})` : sender.name
+		);
+		un.setAttribute("data-user-id", msg.user);
+		un.setAttribute("data-timestamp", msg.timestamp);
+		un.classList.add("unselectable");
+		el.appendChild(un);
+		el.appendChild(document.createElement("br"));
+		el.appendChild(document.createTextNode(sanitizedContent));
+		el.classList.add("selectable");
+
+		if (msg.user != selfId) {
+			// Add click handler to open user popup
+			un.classList.add("is-clickable");
+			un.addEventListener("click", function (e) {
+				e.stopPropagation();
+				manageChatUser(un);
+			});
+			//right click listener
+			un.addEventListener("contextmenu", function (e) {
+				e.stopPropagation();
+				manageChatUser(un);
+			});
+		}
+
+		document.getElementById("chat-messages").appendChild(el);
+		// Auto-scroll to bottom
+		const chatMessages = document.getElementById("chat-messages");
+		chatMessages.scrollTop = chatMessages.scrollHeight;
+	}
+
+	// Stores a chat message in local storage
+	static storeChat(msg) {
+		//TODO THIS IS KINDA BLOATED
+		//adds message to respective chat and stores it
+		const key = msg.channel;
+		let messages = [];
+		try {
+			const existing = localStorage.getItem(key);
+			if (existing) {
+				messages = JSON.parse(existing);
+			}
+		} catch (e) {
+			console.error("Failed to parse chat history:", e);
+			messages = [];
+		}
+		messages.push(msg);
+		//sort by timestamp
+		messages.sort((a, b) => a.timestamp - b.timestamp);
+
+		//filter dups (can occur with multiple windows/instances)
+		messages = messages.filter(
+			(m, i, arr) =>
+				arr.findIndex((x) => x.timestamp === m.timestamp && x.user === m.user && x.content === m.content) === i
+		);
+
+		//constrain to less than localprefs maxMsgHistory
+		if (localPrefs && messages.length > localPrefs.settings.maxMsgHistory) {
+			messages = messages.slice(-localPrefs.settings.maxMsgHistory);
+		}
+
+		localStorage.setItem(key, JSON.stringify(messages));
 	}
 }
 

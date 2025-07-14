@@ -88,9 +88,9 @@
         <div class="chat-input-wrap has-background-black-ter">
           <p class="control has-icons-right">
             <input class="input is-rounded" id="chat-input" type="text" placeholder="Type a message..."
-              onkeydown="if(event.key==='Enter'){sendChat(this.value); this.value='';}" />
+              onkeydown="if(event.key==='Enter'){chatManager.sendChat(this.value); this.value='';}" />
             <span id="sendBtn" class="icon is-right is-clickable mr-1"
-              onclick="const input=this.previousElementSibling;sendChat(input.value);input.value='';">
+              onclick="const input=this.previousElementSibling;chatManager.sendChat(input.value);input.value='';">
               <i class="fas fa-lg fa-paper-plane"></i>
             </span>
           </p>
