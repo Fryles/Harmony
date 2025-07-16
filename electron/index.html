@@ -16,13 +16,17 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.5/purify.min.js"
     integrity="sha512-/CUtA84sWWqWEBejNrrtWa7Yc4cth3Ome2ymvCKOo9YcZ4sh98tndUy4LutE2xGcAgD4fyz16y+gSyJdGCB5ww=="
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="purifyConfig.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
     integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg=="
     crossorigin="anonymous" referrerpolicy="no-referrer" />
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"
     integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
     crossorigin="anonymous"></script>
-  <script defer src="./bulma.js"></script>
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+  <script defer src="bulma.js"></script>
   <title>Harmony</title>
 </head>
 
@@ -87,8 +91,9 @@
         </div>
         <div class="chat-input-wrap has-background-black-ter">
           <p class="control has-icons-right">
-            <input class="input is-rounded" id="chat-input" type="text" placeholder="Type a message..."
-              onkeydown="if(event.key==='Enter'){chatManager.sendChat(this.value); this.value='';}" />
+            <textarea class="textarea has-fixed-size" rows="1" id="chat-input" placeholder="Type your message..."
+              onkeydown="if(event.key==='Enter' && !event.shiftKey){chatManager.sendChat(this.value); this.value='';event.preventDefault();this.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }))}">
+            </textarea>
             <span id="sendBtn" class="icon is-right is-clickable mr-1"
               onclick="const input=this.previousElementSibling;chatManager.sendChat(input.value);input.value='';">
               <i class="fas fa-lg fa-paper-plane"></i>

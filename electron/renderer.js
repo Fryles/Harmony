@@ -32,6 +32,8 @@ async function init() {
 		alert("idk how but u never set a password. please set one");
 	}
 
+	chatManager.chatInit(); //attathces input listeners for formatting and box expand
+
 	document.getElementById("settings-save").addEventListener("click", async () => {
 		if (await storePrefs()) {
 			closeModals();
@@ -313,6 +315,7 @@ async function registerServer() {
 	});
 }
 
+//called in add server modal to attempt to find id from server name, then authenticate with the server and add to ui
 function addServer() {
 	const name = document.getElementById("joinServerNameInput").value;
 	const pwd = document.getElementById("joinServerPasswordInput").value;
@@ -811,6 +814,7 @@ if ($modalCloses.length > 0) {
 function getAll(selector) {
 	return Array.prototype.slice.call(document.querySelectorAll(selector), 0);
 }
+
 function openModal(target) {
 	var $target = document.getElementById(target);
 	rootEl.classList.add("is-clipped");
@@ -1310,10 +1314,32 @@ class FriendsManager {
 }
 // Contains all methods for interacting with or managing chat functionality
 class chatManager {
+	static MAXMSGCHARS = 999;
+	// attatch event listeners for text input
+	static chatInit() {
+		let textarea = document.getElementById("chat-input");
+		textarea.style.height = textarea.scrollHeight + "px";
+		textarea.style.overflowY = "hidden";
+		textarea.value = "";
+
+		textarea.addEventListener("input", function () {
+			//set height according to text input
+			this.style.height = "auto";
+			this.style.height = this.scrollHeight + "px";
+			if (this.scrollHeight > 300) {
+				textarea.style.overflowY = "auto";
+			} else {
+				textarea.style.overflowY = "hidden";
+			}
+			if (this.value.length > this.MAXMSGCHARS) {
+				//TODO show warning that this message will not be stored on server
+			}
+		});
+	}
+
 	// Sanitizes chat content and sends to peers, server (if enabled), and stores in local storage
 	static sendChat(content) {
-		const sanitizedContent = DOMPurify.sanitize(content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, ""));
-		if (!sanitizedContent || sanitizedContent.trim() === "" || sanitizedContent.length > 1000) {
+		if (!content || content.trim() === "" || content.length > 1000) {
 			showToast("Invalid message content. Must be non-empty and less than 1000 characters.");
 			return;
 		}
@@ -1322,7 +1348,7 @@ class chatManager {
 			timestamp: Date.now(),
 			user: selfId,
 			username: localPrefs.user.username,
-			content: sanitizedContent,
+			content: content,
 			channel: currentChat,
 			type: "text",
 			color: localPrefs.settings.accentColor,
@@ -1458,10 +1484,12 @@ class chatManager {
 			return;
 		}
 		// Remove all id attributes and sanitize from msg.content
-		const sanitizedContent = DOMPurify.sanitize(msg.content.replace(/\s*id\s*=\s*(['"])[^'"]*\1/gi, ""));
-		let el = document.createElement("p");
+		const content = DOMPurify.sanitize(msg.content);
+
+		let el = document.createElement("div");
 		let un = document.createElement("span");
 		un.className = "tag";
+		el.classList.add("chatLine");
 		if (msg.color) {
 			un.style.backgroundColor = msg.color;
 			un.style.color = HarmonyUtils.getBestTextColor(msg.color);
@@ -1472,21 +1500,22 @@ class chatManager {
 			el.style = "text-align: end;";
 		}
 
-		let username = msg.username;
 		let sender = userLookup(msg.user);
-		// if (username) {
-		// 	sender.name = username;
-		// }
 		un.innerText = DOMPurify.sanitize(
 			sender.nick != "" && sender.nick != undefined ? `${sender.nick} (${sender.name})` : sender.name
 		);
 		un.setAttribute("data-user-id", msg.user);
 		un.setAttribute("data-timestamp", msg.timestamp);
-		un.classList.add("unselectable");
 		el.appendChild(un);
 		el.appendChild(document.createElement("br"));
-		el.appendChild(document.createTextNode(sanitizedContent));
-		el.classList.add("selectable");
+		let contentDiv = document.createElement("div");
+		contentDiv.classList.add("selectable", "chatContent");
+		contentDiv.innerHTML = content;
+		const codeBlocks = contentDiv.querySelectorAll("pre code");
+		codeBlocks.forEach((block) => {
+			hljs.highlightElement(block);
+		});
+		el.appendChild(contentDiv);
 
 		if (msg.user != selfId) {
 			// Add click handler to open user popup

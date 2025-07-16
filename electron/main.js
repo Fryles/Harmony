@@ -1,5 +1,5 @@
 // Modules to control application life and create native browser window
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
 // Enable live reload for all the files except prefs*.json
@@ -18,6 +18,14 @@ function createWindow() {
 			preload: path.join(__dirname, "preload.js"),
 			contextIsolation: true,
 		},
+	});
+	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+		if (url.startsWith("hrmny::")) {
+			return { action: "allow" };
+		}
+		// open url in a browser and prevent default
+		shell.openExternal(url);
+		return { action: "deny" };
 	});
 
 	// and load the index.html of the app.

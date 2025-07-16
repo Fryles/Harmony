@@ -12,6 +12,16 @@ html {
 	-moz-user-select: none;
 	-ms-user-select: none;
 }
+
+pre {
+	padding: 0.2em;
+	background-color: transparent;
+	text-align: left;
+}
+code {
+	padding: 0.3em;
+	display: inline-block;
+}
 /* scrollbar styling */
 ::-webkit-scrollbar {
 	width: 8px;
@@ -123,6 +133,10 @@ html {
 	padding: 20px;
 	overflow-y: auto;
 	align-content: end;
+}
+#chat-input {
+	border-radius: 10px;
+	max-height: 400px;
 }
 .chat-input-wrap {
 	padding: 10px;
@@ -519,4 +533,21 @@ div.modal-background {
 }
 label.checkbox {
 	margin-right: 0.5em;
+}
+.chatContent {
+	max-width: 900px;
+	max-height: 150px;
+	height: auto;
+	overflow-y: auto;
+	text-align: inherit;
+	display: inline-block;
+	margin-top: 0.3em;
+	overflow-x: hidden;
+	overflow-wrap: anywhere;
+	white-space: pre-line;
+	width: 90%;
+	transition: all 0.3s;
+	border-radius: 10px;
+}
+.chatLine {
 }
