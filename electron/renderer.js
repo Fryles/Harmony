@@ -7,7 +7,7 @@ var userCache = {}; //stores id username pairs
 var userCacheTTL = 1000 * 60 * 30; // 30 minute
 var friendReqs = { incoming: [], outgoing: [] }; //synced with server on start, then updated with socket
 var selfId; //clients userId
-const dev = 1; //controls what server websockets talks to
+const dev = false; //controls what server websockets talks to
 let toastStackHeight = 0; // Global for stacking toasts
 let lastLoopingToast = 0; // Global to stop spamming toasts
 
@@ -221,7 +221,7 @@ async function webSocketInit() {
 			auth: auth,
 		});
 	} else {
-		window.socket = io("https://harmony-server.glitch.me/", {
+		window.socket = io("https://harmony-minv.onrender.com/", {
 			auth: auth,
 		});
 	}

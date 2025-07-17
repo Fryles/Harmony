@@ -1,27 +1,29 @@
 {
-  "name": "electron-quick-start",
-  "version": "1.0.0",
-  "description": "A minimal Electron application",
-  "main": "main.js",
-  "scripts": {
-    "start": "electron ."
-  },
-  "repository": "https://github.com/electron/electron-quick-start",
-  "keywords": [
-    "Electron",
-    "quick",
-    "start",
-    "tutorial",
-    "demo"
-  ],
-  "author": "GitHub",
-  "license": "CC0-1.0",
-  "devDependencies": {
-    "electron": "^36.0.0"
-  },
-  "dependencies": {
-    "bulma": "^1.0.4",
-    "electron-reload": "^2.0.0-alpha.1",
-    "systray2": "^2.1.4"
-  }
+	"name": "harmony",
+	"version": "1.0.0",
+	"description": "An open source webRTC chat+voice client",
+	"main": "main.js",
+	"scripts": {
+		"start": "electron ."
+	},
+	"build": {
+		"appId": "com.fryles.harmony",
+		"productName": "Harmony"
+	},
+	"repository": "https://github.com/Fryles/Harmony",
+	"keywords": [
+		"Harmony",
+		"Not Discord",
+		"Fryles"
+	],
+	"author": "Fryles",
+	"license": "CC0-1.0",
+	"devDependencies": {
+		"electron": "^36.0.0"
+	},
+	"dependencies": {
+		"bulma": "^1.0.4",
+		"electron-reload": "^2.0.0-alpha.1",
+		"systray2": "^2.1.4"
+	}
 }
