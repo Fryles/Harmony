@@ -25,5 +25,6 @@
 		"bulma": "^1.0.4",
 		"electron-reload": "^2.0.0-alpha.1",
 		"systray2": "^2.1.4"
-	}
+	},
+	"packageManager": "yarn@4.9.2"
 }
