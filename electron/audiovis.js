@@ -122,11 +122,7 @@ function hexToRgb(hex) {
 }
 
 // Continuously update border opacity and width based on audio amplitude
-function visualizeBorderWithAudio(
-	stream,
-	elementId,
-	color = getRGB("var(--bulma-primary)")
-) {
+function visualizeBorderWithAudio(stream, elementId, color = getRGB("var(--bulma-primary)")) {
 	const getAmplitude = getAudioAmplitude(stream);
 	const el = document.getElementById(elementId);
 
@@ -145,11 +141,7 @@ function visualizeBorderWithAudio(
 }
 
 // Set slider background to fill with color based on audio amplitude
-function colorSliderWithAudio(
-	stream,
-	sliderId,
-	color = getRGB("var(--bulma-primary)")
-) {
+function colorSliderWithAudio(stream, sliderId, color = getRGB("var(--bulma-primary)")) {
 	const getAmplitude = getAudioAmplitude(stream);
 	const slider = document.getElementById(sliderId);
 	if (!slider) return;
@@ -168,9 +160,7 @@ function colorSliderWithAudio(
 		// Update the ::-webkit-slider-runnable-track style
 		styleTag.textContent = `
 			#${sliderId}::-webkit-slider-runnable-track {
-				background: linear-gradient(90deg, rgba(${color},1) ${percent}%, rgba(${color},0.2) ${
-			percent + 1
-		}%);
+				background: linear-gradient(90deg, rgba(${color},1) ${percent}%, rgba(${color},0.2) ${percent + 1}%);
 			}
 		#hotMicThreshIcon{
 		${amp > rtc.hotMicThresh ? "color: var(--bulma-success) !important" : ""}

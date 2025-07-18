@@ -241,7 +241,9 @@
       </section>
       <footer class="modal-card-foot">
         <div class="buttons">
-          <button class="button is-primary" id="add-friend">Add Friend</button>
+          <button class="button is-primary" id="add-friend"
+            onclick="()=>{FriendsManager.sendFriendReq(document.getElementById('friendIdInput').value);}">Add
+            Friend</button>
           <button class="button close">Cancel</button>
         </div>
       </footer>
@@ -404,9 +406,10 @@
     </div>
   </div>
   <!-- You can also require other files to run in this process -->
-  <script src="./renderer.js"></script>
+  <script type="module" src="./harmony.js"></script>
+  <script type="module" src="./harmony-lib.js"></script>
   <script src="./audiovis.js"></script>
-  <script src="./rtc.js"></script>
+  <script type="module" src="./rtc.js"></script>
   <script>
     // Tab switching logic for Add/Join Server modal
     const addTabBtn = document.getElementById('add-server-tab-btn');

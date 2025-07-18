@@ -32,7 +32,7 @@
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#0cdbab",
+    "accentColor": "#acdbab",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true,
@@ -95,10 +95,10 @@
     "videoInputDevice": null
   },
   "audio": {
-    "inputGain": 1.59,
-    "outputVolume": 0.53,
+    "inputGain": 0.02,
+    "outputVolume": 0.01,
     "hotMicThresh": 0.1,
-    "enableNoiseSuppression": true,
-    "ringVolume": 0.08
+    "enableNoiseSuppression": false,
+    "ringVolume": 0.01
   }
 }

@@ -1,3 +1,5 @@
+import { harmony } from "./harmony.js";
+import { userUtils, uiManager } from "./harmony-lib.js";
 class rtcInterface {
 	constructor() {
 		this.signalingChannel = null; //channel we are currently signaling on
@@ -17,10 +19,31 @@ class rtcInterface {
 		this.ring = null;
 		this.ringTimeout = 10000;
 		this._lastCallVoice = 0;
-		this.inputGainValue = localPrefs.audio.inputGain;
-		this.hotMicThresh = localPrefs.audio.hotMicThresh;
+		this.inputGainValue = harmony.localPrefs.audio.inputGain;
+		this.hotMicThresh = harmony.localPrefs.audio.hotMicThresh;
 
 		this._registerSocketEvents();
+		// Join all server and friend chats on startup
+		if (harmony.localPrefs) {
+			console.log(harmony.localPrefs);
+
+			// Join all server chats
+			if (Array.isArray(harmony.localPrefs.servers)) {
+				harmony.localPrefs.servers.forEach((server) => {
+					if (server.secret) {
+						this.joinChannel(`chat:${server.secret}`);
+					}
+				});
+			}
+			// Join all friend chats
+			if (Array.isArray(harmony.localPrefs.friends)) {
+				harmony.localPrefs.friends.forEach((friend) => {
+					if (friend.chat) {
+						this.joinChannel(`chat:${friend.chat}`);
+					}
+				});
+			}
+		}
 	}
 
 	_registerSocketEvents() {
@@ -37,7 +60,7 @@ class rtcInterface {
 				console.warn("Got welcome on channel we are not signaling on???");
 			}
 
-			data.peers = data.peers.filter((peerId) => peerId !== selfId);
+			data.peers = data.peers.filter((peerId) => peerId !== harmony.selfId);
 			// Extract type from data.channel (format: "type:channelName")
 			const [type] = data.channel ? data.channel.split(":") : [null];
 			//if type is a voice or video channel, check for peer count
@@ -47,8 +70,8 @@ class rtcInterface {
 				return;
 			}
 			data.peers.forEach((peerId) => {
-				//if not in global userCache, emit to server to get username
-				checkUserCache(peerId);
+				//if not in global harmony.userCache, emit to server to get username
+				userUtils.checkUserCache(peerId);
 				if (type == "voice") {
 					this.startVoiceConnection(peerId);
 				} else if (type == "chat") {
@@ -69,8 +92,8 @@ class rtcInterface {
 			const newPeer = data.from;
 			console.log(`${newPeer} joined channel ${data.channel}`);
 
-			//if not in global userCache, emit to server to get username
-			checkUserCache(newPeer);
+			//if not in global harmony.userCache, emit to server to get username
+			userUtils.checkUserCache(newPeer);
 
 			//add channel to peer
 			this.peerChannels[newPeer] = this.peerChannels[newPeer] || [];
@@ -227,7 +250,7 @@ class rtcInterface {
 			this.voiceRingEnd(); //stop ring if we are ending it early
 			this.ring = null;
 		}
-		removeVoiceUser(selfId);
+		removeVoiceUser(harmony.selfId);
 		setVoiceUIState("idle");
 		//send courtesy dataChannel message to remove yourself for any chat only peers
 
@@ -290,8 +313,8 @@ class rtcInterface {
 			//switch ui to view the channel we are joining
 			if (setChannelType(currentChat, "voice") != channel) {
 				//if we are not in the channel we are joining, switch to it
-				const server = (localPrefs.servers || []).find((s) => s.secret === channel.split(":")[1]);
-				const friend = (localPrefs.friends || []).find((f) => f.chat === channel.split(":")[1]);
+				const server = (harmony.localPrefs.servers || []).find((s) => s.secret === channel.split(":")[1]);
+				const friend = (harmony.localPrefs.friends || []).find((f) => f.chat === channel.split(":")[1]);
 				if (server) {
 					const serverElem = document.querySelector(`.server-item[name="${server.id}"]`);
 					if (serverElem) {
@@ -315,7 +338,7 @@ class rtcInterface {
 		//change color of call button and stop anims
 		setVoiceUIState("inCall", channel);
 		//add ourselves to ui
-		addVoiceUser(selfId);
+		addVoiceUser(harmony.selfId);
 		this.joinChannel(channel);
 	}
 
@@ -338,7 +361,7 @@ class rtcInterface {
 		}
 		const msg = {
 			timestamp: Date.now(),
-			user: selfId,
+			user: harmony.selfId,
 			content: "",
 			channel: channel,
 			type: "voiceRing",
@@ -348,11 +371,11 @@ class rtcInterface {
 		this.ring = {
 			type: "outgoing voice",
 			audio: new Audio("ring.m4a"),
-			from: selfId,
+			from: harmony.selfId,
 			channel: channel,
 		};
 		this.ring.audio.loop = true;
-		this.ring.audio.volume = localPrefs.audio.ringVolume ? localPrefs.audio.ringVolume : 0.7;
+		this.ring.audio.volume = harmony.localPrefs.audio.ringVolume ? harmony.localPrefs.audio.ringVolume : 0.7;
 		this.ring.audio.play();
 		//add ourselves to the ui and play anims
 		setVoiceUIState("ringing");
@@ -384,11 +407,11 @@ class rtcInterface {
 			return;
 		} else if (this.mediaChannel) {
 			//ALREADY IN VC
-			const server = localPrefs.servers.find((s) => s.secret === msg.channel.split(":")[1]);
+			const server = harmony.localPrefs.servers.find((s) => s.secret === msg.channel.split(":")[1]);
 			const user = userLookup(msg.user);
 
 			if (server) {
-				showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
+				uiManager.showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
 					this.VoiceHangup();
 					const serverElem = document.querySelector(`.server-item[name="${server.id}"]`);
 					if (serverElem) {
@@ -399,7 +422,7 @@ class rtcInterface {
 					this.voiceJoin(this.ring.channel);
 				});
 			} else {
-				showToast(`Incoming call from ${user.nick ? user.nick : user.name}`, () => {
+				uiManager.showToast(`Incoming call from ${user.nick ? user.nick : user.name}`, () => {
 					this.VoiceHangup();
 					const friendElem = document.querySelector(`.friend-item[name="${msg.user}"]`);
 					if (friendElem) {
@@ -413,15 +436,15 @@ class rtcInterface {
 			return;
 		}
 		this.ring.audio.loop = true;
-		this.ring.audio.volume = localPrefs.audio.ringVolume ? localPrefs.audio.ringVolume : 0.7;
+		this.ring.audio.volume = harmony.localPrefs.audio.ringVolume ? harmony.localPrefs.audio.ringVolume : 0.7;
 		this.ring.audio.play();
 		//add our caller to the ui and play anims
 		setVoiceUIState("ringing");
 		addVoiceUser(msg.user);
-		const server = localPrefs.servers.find((s) => s.id === msg.channel.split(":")[1]);
+		const server = harmony.localPrefs.servers.find((s) => s.id === msg.channel.split(":")[1]);
 		const user = userLookup(msg.user);
 		if (server) {
-			showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
+			uiManager.showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
 				const serverElem = document.querySelector(`.server-item[name="${server.id}"]`);
 				if (serverElem) {
 					serverElem.click();
@@ -431,7 +454,7 @@ class rtcInterface {
 				this.voiceJoin(this.ring.channel);
 			});
 		} else {
-			showToast(`Incoming call from ${user.nick ? user.nick : user.name}`, () => {
+			uiManager.showToast(`Incoming call from ${user.nick ? user.nick : user.name}`, () => {
 				const friendElem = document.querySelector(`.friend-item[name="${msg.user}"]`);
 				if (friendElem) {
 					FriendsManager.selectFriend(friendElem);
@@ -508,13 +531,13 @@ class rtcInterface {
 
 			const msg = {
 				timestamp: Date.now(),
-				user: selfId,
+				user: harmony.selfId,
 				content: "",
 				channel: this.mediaChannel,
 				type: "voiceLeave",
 			};
 
-			removeVoiceUser(selfId);
+			removeVoiceUser(harmony.selfId);
 			setVoiceUIState("idle");
 			console.log(`Sending voiceLeave on ${this.mediaChannel}`);
 			this.sendMessage(msg, setChannelType(this.mediaChannel, "chat"));
@@ -617,13 +640,13 @@ class rtcInterface {
 	sendMessage(msg, channel) {
 		//send message to peers in specified channel
 		Object.keys(this.peerConnections).forEach((peerId) => {
-			if (peerId !== selfId && this.peerChannels[peerId] && this.peerChannels[peerId].includes(channel)) {
+			if (peerId !== harmony.selfId && this.peerChannels[peerId] && this.peerChannels[peerId].includes(channel)) {
 				const dc = this.dataChannels[peerId];
 				if (dc && dc.readyState === "open") {
 					dc.send(JSON.stringify(msg));
 				} else {
 					console.log(`message not sent to ${peerId}`);
-					showToast("Error sending msg...");
+					uiManager.showToast("Error sending msg...");
 				}
 			}
 		});
@@ -674,7 +697,7 @@ class rtcInterface {
 
 	sendSignalingMessage(channel, peerId, msg) {
 		this.socket.emit("message", channel, peerId, {
-			from: selfId,
+			from: harmony.selfId,
 			target: peerId,
 			msg,
 		});
@@ -788,7 +811,7 @@ class rtcInterface {
 		const remoteSource = this._audioContext.createMediaStreamSource(stream);
 		const remoteGainNode = this._audioContext.createGain();
 		// Set gain to friend volume or 1
-		const friendPref = localPrefs.friends.filter((f) => f.id == peerId)[0];
+		const friendPref = harmony.localPrefs.friends.filter((f) => f.id == peerId)[0];
 		remoteGainNode.gain.value = friendPref && typeof friendPref.volume === "number" ? friendPref.volume : 1;
 
 		const remoteDestination = this._audioContext.createMediaStreamDestination();
@@ -823,9 +846,9 @@ class rtcInterface {
 			// Try to get the preferred audio input device from prefs.json (if available)
 			let deviceId = null;
 
-			const audioInputDevices = localPrefs.devices.audioInputDevices;
-			const preferredDevice = localPrefs.devices.audioInputDevice
-				? localPrefs.devices.audioInputDevice.deviceId
+			const audioInputDevices = harmony.localPrefs.devices.audioInputDevices;
+			const preferredDevice = harmony.localPrefs.devices.audioInputDevice
+				? harmony.localPrefs.devices.audioInputDevice.deviceId
 				: audioInputDevices[0].deviceId; // Use the first device as preferred
 			deviceId = preferredDevice;
 			if (!preferredDevice) {
@@ -877,10 +900,11 @@ class rtcInterface {
 			updateGainBasedOnAmplitude();
 		} catch (err) {
 			console.warn("Could not get local audio:", err);
-			showToast("Missing Audio Input Device");
+			uiManager.showToast("Missing Audio Input Device");
 		}
 	}
 }
+export default rtcInterface;
 
 // Utility function to set UI state for voice call controls
 function setVoiceUIState(state, id = "") {
@@ -903,10 +927,10 @@ function setVoiceUIState(state, id = "") {
 		}
 		if (!base) return null;
 		// Try to find friend by chat
-		const friend = (localPrefs.friends || []).find((f) => f.chat === channel || f.chat === base);
+		const friend = (harmony.localPrefs.friends || []).find((f) => f.chat === channel || f.chat === base);
 		if (friend) return friend.id;
 		// Try to find server by secret
-		const server = (localPrefs.servers || []).find((s) => s.secret === base);
+		const server = (harmony.localPrefs.servers || []).find((s) => s.secret === base);
 		if (server) return server.id;
 		return null;
 	}
@@ -1044,29 +1068,12 @@ function addVoiceUser(userId) {
 	}
 	document.getElementById("voice-list").appendChild(voiceUser);
 	//add talking animation
-	if (userId == selfId) visualizeBorderWithAudio(rtc.localAudioStream, userId);
+	if (userId == harmony.selfId) visualizeBorderWithAudio(rtc.localAudioStream, userId);
 }
 
 function removeVoiceUser(userId) {
 	const voiceUser = document.getElementById(userId);
 	if (voiceUser && voiceUser.parentNode) {
 		voiceUser.parentNode.removeChild(voiceUser);
-	}
-}
-
-function checkUserCache(userId) {
-	if (!userCache[userId] || (userCache[userId] && userCache[userId].timestamp < Date.now() - userCacheTTL)) {
-		userCache[userId] = "";
-		this.socket.emit("getUsername", userId, (username) => {
-			if (username) {
-				userCache[userId] = { name: username, timestamp: Date.now() };
-				// Save the updated cache to local storage
-				saveUserCache();
-				console.log(`Cached username for ${userId}: ${username}`);
-			} else {
-				console.warn(`Server did not have username for: ${userId}`);
-				userCache[userId] = null;
-			}
-		});
 	}
 }

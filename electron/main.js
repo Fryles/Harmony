@@ -2,12 +2,21 @@
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
-// Enable live reload for all the files except prefs*.json
+var userDataPath = app.getPath("userData"); // e.g. ~/Library/Application Support/Harmony
 
-require("electron-reload")(__dirname, {
-	electron: require(`${__dirname}/node_modules/electron`),
-	ignored: /(^[\/\\]\.|[\/\\]prefs.*\.json$|[\/\\]node_modules[\/\\]|[\/\\]dist[\/\\]|[\/\\]src[\/\\]$)/,
-});
+//if dev
+if (!app.isPackaged) {
+	userDataPath = __dirname;
+	try {
+		require("electron-reload")(__dirname, {
+			electron: require(`${__dirname}/node_modules/electron`),
+			ignored: /(^[\/\\]\.|[\/\\]prefs.*\.json$|[\/\\]node_modules[\/\\]|[\/\\]dist[\/\\]|[\/\\]src[\/\\]$)/,
+		});
+	} catch (err) {
+		console.warn("electron-reload failed:", err);
+	}
+}
+console.log("using userData path of", userDataPath);
 
 function createWindow() {
 	// Create the browser window.
@@ -19,8 +28,9 @@ function createWindow() {
 			contextIsolation: true,
 		},
 	});
+
 	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-		if (url.startsWith("hrmny::")) {
+		if (url.startsWith("hrmny::") || url.startsWith("HRMNY::")) {
 			return { action: "allow" };
 		}
 		// open url in a browser and prevent default
@@ -62,7 +72,8 @@ function getPrefs(event, accountId) {
 	try {
 		// Use accountId to determine prefs path
 		const id = accountId || (event && event.sender && event.sender.id);
-		const prefsPath = path.join(__dirname, `prefs-${id}.json`);
+
+		const prefsPath = path.join(userDataPath, `prefs-${id}.json`);
 		if (fs.existsSync(prefsPath)) {
 			const prefs = fs.readFileSync(prefsPath);
 			return JSON.parse(prefs);
@@ -85,19 +96,11 @@ function updatePrefs(event, prefs, accountId) {
 	// Remove any undefined or function values
 	prefs = JSON.parse(JSON.stringify(prefs));
 
-	// Use windowId to determine prefs path (DEV)
+	// Use windowId to determine prefs path if no accountId
 	const id = accountId || (event && event.sender && event.sender.id);
-	const prefsPath = path.join(__dirname, `prefs-${id}.json`);
+	const prefsPath = path.join(userDataPath, `prefs-${id}.json`);
 
 	fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2));
-	//write accent to accent.css
-	// let accent = hexToHsl(prefs.settings.accentColor);
-	// let styles = ` :root {
-	//           --bulma-primary-h: ${accent[0]};
-	// 					--bulma-primary-s: ${accent[1]}%;
-	// 					--bulma-primary-l: ${accent[2]}%;
-	// }`;
-	// fs.writeFileSync(path.join(__dirname, "accent.css"), styles);
 }
 
 function hexToHsl(hex) {

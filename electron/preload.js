@@ -23,15 +23,13 @@ window.addEventListener("DOMContentLoaded", async () => {
 		//no prefs.json
 		prefs = defaultPrefs();
 		prefs = await autoUpdateDevices(prefs);
-		console.log("Updating prefs with : ", prefs);
+		console.log("Created default prefs with : ", prefs);
 		ipcRenderer.send("update-prefs", prefs, accId);
 		loadPrefs(prefs);
 		openModal("settings-modal");
 		// Hide settings-delete and settings-close elements
-		const del = document.getElementById("settings-delete");
-		if (del) del.style.display = "none";
-		const close = document.getElementById("settings-close");
-		if (close) close.style.display = "none";
+
+		return;
 	} else {
 		//we already have prefs, attempt to update w/ connected devices
 

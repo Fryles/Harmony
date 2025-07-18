@@ -4,11 +4,20 @@
 	"description": "An open source webRTC chat+voice client",
 	"main": "main.js",
 	"scripts": {
-		"start": "electron ."
+		"start": "electron .",
+		"app:dir": "electron-builder --dir",
+		"app:dist": "electron-builder"
 	},
 	"build": {
 		"appId": "com.fryles.harmony",
-		"productName": "Harmony"
+		"productName": "Harmony",
+		"mac": {
+			"category": "your.app.category.type"
+		},
+		"files": [
+			"!node_modules/electron",
+			"**/*"
+		]
 	},
 	"repository": "https://github.com/Fryles/Harmony",
 	"keywords": [
@@ -17,13 +26,14 @@
 		"Fryles"
 	],
 	"author": "Fryles",
-	"license": "CC0-1.0",
+	"license": "GPL-3.0-only",
 	"devDependencies": {
-		"electron": "^36.0.0"
+		"electron": "^36.0.0",
+		"electron-builder": "26.0.12",
+		"electron-reload": "^2.0.0-alpha.1"
 	},
 	"dependencies": {
 		"bulma": "^1.0.4",
-		"electron-reload": "^2.0.0-alpha.1",
 		"systray2": "^2.1.4"
 	},
 	"packageManager": "yarn@4.9.2"

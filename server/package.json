@@ -6,7 +6,7 @@
 	"type": "module",
 	"repository": "",
 	"author": "fryles",
-	"license": "give me 10% or i will sue you",
+	"license": "GPL-3.0-only",
 	"scripts": {
 		"start": "node server.js"
 	},
@@ -24,8 +24,5 @@
 	},
 	"devDependencies": {
 		"nodemon": "^3.1.10"
-	},
-	"engines": {
-		"node": ">=16.x <=23.11.x"
 	}
 }
