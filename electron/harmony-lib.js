@@ -142,7 +142,7 @@ class FriendsManager {
 					id: req.from,
 					chat: req.chat,
 				});
-				showToast(`${DOMPurify.sanitize(req.fromName)} Is Now Your Friend!`, FriendsManager.showFriends);
+				uiManager.showToast(`${DOMPurify.sanitize(req.fromName)} Is Now Your Friend!`, FriendsManager.showFriends);
 				window.electronAPI.updatePrefs(harmony.localPrefs);
 			};
 			reqDiv.querySelector(".reject-friend-request").onclick = () => {
@@ -150,7 +150,7 @@ class FriendsManager {
 				socket.emit("friendRequestResponse", req);
 				reqDiv.remove();
 				harmony.friendReqs.incoming = harmony.friendReqs.incoming.filter((r) => r.id !== req.id);
-				showToast(`Removed Friend Request`);
+				uiManager.showToast(`Removed Friend Request`);
 			};
 			friendsContainer.appendChild(reqDiv);
 		});
@@ -176,7 +176,7 @@ class FriendsManager {
 				socket.emit("cancelFriendRequest", req);
 				reqDiv.remove();
 				harmony.friendReqs.outgoing = harmony.friendReqs.outgoing.filter((r) => r.to !== req.to);
-				showToast(`Cancelled Friend Request`);
+				uiManager.showToast(`Cancelled Friend Request`);
 			};
 			friendsContainer.appendChild(reqDiv);
 		});
@@ -206,22 +206,22 @@ class FriendsManager {
 	static sendFriendReq(userId) {
 		if (harmony.localPrefs.friends.filter((f) => f.id == userId).length > 0) {
 			//already friends
-			showToast("Already Friends With This User");
+			uiManager.showToast("Already Friends With This User");
 			return;
 		}
 		if (harmony.friendReqs.outgoing.filter((r) => r.to == userId).length > 0) {
 			//already sent req
-			showToast("Already Sent Request");
+			uiManager.showToast("Already Sent Request");
 			return;
 		}
 		if (userId == harmony.selfId) {
 			//can't send friend request to self
-			showToast("You ur own best fran og");
+			uiManager.showToast("You ur own best fran og");
 			return;
 		}
 		const uuidv4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 		if (!uuidv4Regex.test(userId)) {
-			showToast("Invalid User ID (must be UUIDv4)");
+			uiManager.showToast("Invalid User ID (must be UUIDv4)");
 			return;
 		}
 
@@ -239,8 +239,8 @@ class FriendsManager {
 				}
 			}
 		});
-		closeModals();
-		showToast("Sent Friend Request");
+		uiManager.closeModals();
+		uiManager.showToast("Sent Friend Request");
 		document.getElementById("friendIdInput").value = "";
 	}
 
@@ -270,7 +270,7 @@ class FriendsManager {
 					chat: request.chat,
 				});
 				window.electronAPI.updatePrefs(harmony.localPrefs);
-				showToast(`${DOMPurify.sanitize(request.toName)} Is Now Your Friend!`);
+				uiManager.showToast(`${DOMPurify.sanitize(request.toName)} Is Now Your Friend!`);
 			} else {
 			}
 			//update friend requests
@@ -307,7 +307,10 @@ class FriendsManager {
 					console.warn("Already have this request");
 					return;
 				}
-				showToast(`${DOMPurify.sanitize(request.fromName)} Sent You a Friend Request`, this.showFriendRequests);
+				uiManager.showToast(
+					`${DOMPurify.sanitize(request.fromName)} Sent You a Friend Request`,
+					this.showFriendRequests
+				);
 			}
 		});
 
@@ -427,7 +430,7 @@ class chatManager {
 	// Sanitizes chat content and sends to peers, server (if enabled), and stores in local storage
 	static sendChat(content) {
 		if (!content || content.trim() === "" || content.length > 1000) {
-			showToast("Invalid message content. Must be non-empty and less than 1000 characters.");
+			uiManager.showToast("Invalid message content. Must be non-empty and less than 1000 characters.");
 			return;
 		}
 		//BIG ASSUMPTION THAT WE ONLY SEND CHAT FROM harmony.CURRENTCHAT
@@ -609,12 +612,12 @@ class chatManager {
 			un.classList.add("is-clickable");
 			un.addEventListener("click", function (e) {
 				e.stopPropagation();
-				manageChatUser(un);
+				uiManager.manageChatUser(un);
 			});
 			//right click listener
 			un.addEventListener("contextmenu", function (e) {
 				e.stopPropagation();
-				manageChatUser(un);
+				uiManager.manageChatUser(un);
 			});
 		}
 
@@ -869,7 +872,7 @@ class uiManager {
 	static manageVoiceUser(e) {
 		//make sure were not clicking ourselves
 		if (e.target.id == harmony.selfId) {
-			showToast("Thats You!");
+			uiManager.showToast("Thats You!");
 			return;
 		}
 
@@ -882,7 +885,7 @@ class uiManager {
 		if (existingPopup) existingPopup.remove();
 
 		const userId = userDiv.id;
-		let friend = userLookup(userId);
+		let friend = userUtils.userLookup(userId);
 		let username = DOMPurify.sanitize(
 			friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name
 		);
@@ -988,7 +991,7 @@ class uiManager {
 
 		if (!userId || !timestamp) {
 			// Not enough info to show popup
-			showToast("User info not available for this message.");
+			uiManager.showToast("User info not available for this message.");
 			return;
 		}
 
@@ -996,7 +999,7 @@ class uiManager {
 		const existingPopup = document.getElementById("chat-user-popup");
 		if (existingPopup) existingPopup.remove();
 
-		let friend = userLookup(userId);
+		let friend = userUtils.userLookup(userId);
 		let username = DOMPurify.sanitize(
 			friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name
 		);
@@ -1055,7 +1058,7 @@ class uiManager {
 			const removeBtn = popup.querySelector("#removeFriendChatBtn");
 			removeBtn.onclick = () => {
 				FriendsManager.removeFriend(userId, () => {
-					showToast(`Removed ${username} from friends`);
+					uiManager.showToast(`Removed ${username} from friends`);
 				});
 				// Remove the popup and refresh friends list
 				popup.remove();

@@ -1,3 +1,4 @@
+import { harmony } from "./harmony.js";
 // Audio Visualizer for rtc.localAudioStream
 function attachAudioVisualizer(stream, canvasId = "audio-visualizer") {
 	// Remove existing canvas if present
@@ -68,7 +69,7 @@ function getAudioAmplitude(stream) {
 	let lastValue = 0;
 	const smoothing = 0.7; // 0 = no smoothing, 0.9 = very smooth
 	const decaySmoothing = 0.92; // higher = slower decay
-	const decayThreshold = localPrefs.audio.hotMicThresh; // amplitude threshold for decay
+	const decayThreshold = harmony.localPrefs.audio.hotMicThresh; // amplitude threshold for decay
 
 	function amplitude() {
 		analyser.getByteFrequencyData(dataArray);

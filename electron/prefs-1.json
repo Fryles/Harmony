@@ -1,104 +1,106 @@
 {
-	"user": {
-		"username": "magenter",
-		"userId": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
-		"secret": "987654321"
-	},
-	"servers": [
-		{
-			"name": "test",
-			"id": "2a9aa2f3-f477-4ea0-9b0c-a48c28902043",
-			"secret": "4d843073fb5fbf710e58a952f9475e3cb777011ecc065f6ab870f2cd28a2f4ea",
-			"options": {
-				"serverOpen": false,
-				"serverUnlisted": false,
-				"serverStoredMessaging": true
-			},
-			"admin": "f842a398-9470-4644-8165-64aad570267f",
-			"messages": []
-		},
-		{
-			"name": "test3",
-			"id": "9e41874d-4df7-4353-a5ce-a7e3a898602e",
-			"secret": "7cb91d4d6b9a1576625dbc8674373b0d9d8da902de3b91e64f10ee2a26049de8",
-			"options": {
-				"serverOpen": true,
-				"serverUnlisted": false,
-				"serverStoredMessaging": true
-			},
-			"admin": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
-			"messages": []
-		}
-	],
-	"settings": {
-		"theme": "dark",
-		"accentColor": "#ab4dad",
-		"language": "en-US",
-		"notifications": true,
-		"checkUpdate": true,
-		"maxMsgHistory": 50
-	},
-	"friends": [
-		{
-			"name": "matchamatchamatrcha",
-			"id": "f842a398-9470-4644-8165-64aad570267f",
-			"chat": "64133918c65e77cc558bd0ed593a3c18ed4f39e39499f286"
-		}
-	],
-	"devices": {
-		"videoInputDevices": [],
-		"audioInputDevices": [
-			{
-				"deviceId": "default",
-				"kind": "audioinput",
-				"label": "Default - Myle pods (Bluetooth)"
-			},
-			{
-				"deviceId": "adf1b2698ded844dd38ce591bece70345f9ce083098778a8f834d094394c6958",
-				"kind": "audioinput",
-				"label": "Myle pods (Bluetooth)"
-			}
-		],
-		"audioOutputDevices": [
-			{
-				"deviceId": "default",
-				"kind": "audiooutput",
-				"label": "Default - Myle pods (Bluetooth)"
-			},
-			{
-				"deviceId": "74d3fbc1b8fd13c66557e0c4e8e96fbb86c78c5aec9bbfcdc7df632944081459",
-				"kind": "audiooutput",
-				"label": "Myle pods (Bluetooth)"
-			},
-			{
-				"deviceId": "8c9f8879e73bbe41a62d6b46974c8207e5f5f195a7a027f6c4cb34ffe2301d19",
-				"kind": "audiooutput",
-				"label": "HP 24mh (HDMI)"
-			},
-			{
-				"deviceId": "3ba3c3d25cf966eed55eb5a85c028eb87a86a5ac1b23e578c1c70fd9411a28a7",
-				"kind": "audiooutput",
-				"label": "HP 24mh (DisplayPort)"
-			},
-			{
-				"deviceId": "1e1ef80854158af93f92a9a18ea1cff347d2b738ec9f701f26dcf0bd72fb9798",
-				"kind": "audiooutput",
-				"label": "Mac mini Speakers (Built-in)"
-			}
-		],
-		"audioInputDevice": null,
-		"audioOutputDevice": {
-			"deviceId": "default",
-			"kind": "audiooutput",
-			"label": "Default - Myle pods (Bluetooth)"
-		},
-		"videoInputDevice": null
-	},
-	"audio": {
-		"inputGain": 1,
-		"outputVolume": 0.8,
-		"hotMicThresh": 0.1,
-		"enableNoiseSuppression": true,
-		"ringVolume": 0.5
-	}
+  "user": {
+    "username": "Snazzy Cow",
+    "userId": "f3d77a24-c5f1-414e-a005-979f3d401846",
+    "password": "",
+    "secret": "65a475d62a07f7668e244d5d96fbffc651f94b889596cf36153f6a1c00f851c6"
+  },
+  "servers": [
+    {
+      "name": "test",
+      "id": "2a9aa2f3-f477-4ea0-9b0c-a48c28902043",
+      "secret": "4d843073fb5fbf710e58a952f9475e3cb777011ecc065f6ab870f2cd28a2f4ea",
+      "options": {
+        "serverOpen": false,
+        "serverUnlisted": false,
+        "serverStoredMessaging": true
+      },
+      "admin": "f842a398-9470-4644-8165-64aad570267f",
+      "messages": [
+        {
+          "timestamp": 1752873566553,
+          "user": "3c722063-90bf-4854-9500-89d32cdf98c6",
+          "username": "Saucy Mole",
+          "content": "hey",
+          "type": "text",
+          "color": "#3bdbcd"
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "theme": "dark",
+    "accentColor": "#3bdbcd",
+    "language": "en-US",
+    "notifications": true,
+    "checkUpdate": true,
+    "maxMsgHistory": 50
+  },
+  "friends": [
+    {
+      "name": "Saucy Mole",
+      "id": "3c722063-90bf-4854-9500-89d32cdf98c6",
+      "chat": "9a623a8c88065b805057f67c905dda359fa1acff9d34c7e6"
+    }
+  ],
+  "devices": {
+    "videoInputDevices": [],
+    "audioInputDevices": [
+      {
+        "deviceId": "default",
+        "kind": "audioinput",
+        "label": "Default - Myle pods (Bluetooth)"
+      },
+      {
+        "deviceId": "76a99ee2f3660b6531a19c778271fec1ed6235beb3d06ac925286d5e2989f7a6",
+        "kind": "audioinput",
+        "label": "Myle pods (Bluetooth)"
+      }
+    ],
+    "audioOutputDevices": [
+      {
+        "deviceId": "default",
+        "kind": "audiooutput",
+        "label": "Default - Myle pods (Bluetooth)"
+      },
+      {
+        "deviceId": "ee0edfd3c8fa1495b4c04ed21bcbfcccf1fcbb6d73e605180be031c2d6af40d6",
+        "kind": "audiooutput",
+        "label": "Myle pods (Bluetooth)"
+      },
+      {
+        "deviceId": "3825d5b1e40ce8679607ce39c6742e43370a6df6383fda3e807b36b3b7afd74e",
+        "kind": "audiooutput",
+        "label": "HP 24mh (HDMI)"
+      },
+      {
+        "deviceId": "00fac35d78a6f9ab70b097b76f641f683089200361fed396a81f2910c22d93e9",
+        "kind": "audiooutput",
+        "label": "HP 24mh (DisplayPort)"
+      },
+      {
+        "deviceId": "f5443041a452f5f5a0bb78918d54687df252eb9117286d400fb42b73163d9ed2",
+        "kind": "audiooutput",
+        "label": "Mac mini Speakers (Built-in)"
+      }
+    ],
+    "audioInputDevice": {
+      "deviceId": "default",
+      "kind": "audioinput",
+      "label": "Default - Myle pods (Bluetooth)"
+    },
+    "audioOutputDevice": {
+      "deviceId": "default",
+      "kind": "audiooutput",
+      "label": "Default - Myle pods (Bluetooth)"
+    },
+    "videoInputDevice": null
+  },
+  "audio": {
+    "inputGain": 1,
+    "outputVolume": 0.8,
+    "hotMicThresh": 0.1,
+    "enableNoiseSuppression": true,
+    "ringVolume": 0.5
+  }
 }

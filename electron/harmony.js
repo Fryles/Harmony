@@ -11,7 +11,7 @@ export const harmony = {
 	localPrefs: null,
 	friendReqs: { incoming: [], outgoing: [] },
 	selfId: null,
-	rtc: {},
+	rtc: null,
 	dev: false,
 };
 const dev = harmony.dev;
@@ -41,7 +41,7 @@ async function init() {
 		if (close) close.style.display = "none";
 		document.getElementById("settings-save").addEventListener("click", async () => {
 			if (await storePrefs()) {
-				closeModals();
+				uiManager.closeModals();
 				location.reload();
 			}
 		});
@@ -119,11 +119,11 @@ async function init() {
 					uiManager.openModal("manage-friend-modal");
 					document.getElementById("manage-friend-remove").onclick = () => {
 						FriendsManager.removeFriend(friendId, () => {
-							showToast(`Removed ${friend.name} from friends`);
+							uiManager.showToast(`Removed ${friend.name} from friends`);
 						});
 						//remove from ui
 						div.remove();
-						closeModals();
+						uiManager.closeModals();
 					};
 					document.getElementById("manage-friend-save").onclick = () => {
 						friend.nick = document.getElementById("friendNickInput").value;
@@ -139,7 +139,7 @@ async function init() {
 						div.onclick = FriendsManager.selectFriend;
 						div.addEventListener("click", FriendsManager.selectFriend, true);
 						//close modal
-						closeModals();
+						uiManager.closeModals();
 					};
 				} else {
 					//no friend found??
@@ -209,12 +209,12 @@ async function webSocketInit() {
 		if (err.message == "xhr poll error") {
 			const now = Date.now();
 			if (now - lastLoopingToast > 7000) {
-				showToast("Disconnected from server");
+				uiManager.showToast("Disconnected from server");
 				lastLoopingToast = now;
 			}
 			return;
 		}
-		showToast(err.message);
+		uiManager.showToast(err.message);
 	});
 	window.socket.emit("ready");
 }
@@ -234,17 +234,17 @@ async function registerServer() {
 	};
 	if ((pwd === "" || !pwd || pwd.trim() === "") && !options.serverOpen) {
 		//empty pwd with non-open server
-		showToast("A Closed Server Must Have a Password");
+		uiManager.showToast("A Closed Server Must Have a Password");
 		return;
 	}
 	// Password complexity check for closed servers
 	if (!options.serverOpen && !HarmonyUtils.isPasswordComplex(pwd)) {
-		showToast("Password must be at least 8 characters.");
+		uiManager.showToast("Password must be at least 8 characters.");
 		return;
 	}
 
 	if (name.length > 32 || name.length < 3) {
-		showToast("Server name is too long or too short.");
+		uiManager.showToast("Server name is too long or too short.");
 		return;
 	}
 
@@ -258,7 +258,7 @@ async function registerServer() {
 		if (res.success) {
 			console.log(res);
 
-			showToast(`Created Server: ${res.server.name}`);
+			uiManager.showToast(`Created Server: ${res.server.name}`);
 			// Add server to prefs and update
 			if (!harmony.localPrefs.servers) harmony.localPrefs.servers = [];
 			harmony.localPrefs.servers.push(res.server);
@@ -285,11 +285,11 @@ async function registerServer() {
 					serverList.appendChild(serverDiv);
 				}
 			}
-			closeModals();
+			uiManager.closeModals();
 			window.electronAPI.updatePrefs(harmony.localPrefs);
 		} else {
 			if (res.error) {
-				showToast(res.error);
+				uiManager.showToast(res.error);
 			}
 		}
 	});
@@ -300,7 +300,7 @@ function addServer() {
 	const name = document.getElementById("joinServerNameInput").value;
 	const pwd = document.getElementById("joinServerPasswordInput").value;
 	if (!name || name.trim() === "") {
-		showToast("Server name cannot be empty.");
+		uiManager.showToast("Server name cannot be empty.");
 		return;
 	}
 
@@ -308,7 +308,7 @@ function addServer() {
 	socket.emit("serverQuery", name, true, async (res) => {
 		res = res[0];
 		if (!res.id) {
-			showToast(`Failed to join ${name}`, null, "is-danger");
+			uiManager.showToast(`Failed to join ${name}`, null, "is-danger");
 		}
 		const secret = await hashbrown(`server:${res.id}:${pwd}`);
 		socket.emit("serverAuth", name, res.id, secret, (res) => {
@@ -339,17 +339,17 @@ function addServer() {
 						serverList.appendChild(serverDiv);
 					}
 				}
-				showToast(`Joined ${DOMPurify.sanitize(res.name)}`, () => {
+				uiManager.showToast(`Joined ${DOMPurify.sanitize(res.name)}`, () => {
 					const serverItem = document.querySelector(`.server-item[name="${res.id}"]`);
 					if (serverItem) {
 						serverItem.dispatchEvent(new Event("click", { bubbles: true }));
 					}
 				});
 				// Update prefs and close modal
-				closeModals();
+				uiManager.closeModals();
 				window.electronAPI.updatePrefs(harmony.localPrefs);
 			} else {
-				showToast(`Failed to join ${name}`, null, "is-danger");
+				uiManager.showToast(`Failed to join ${name}`, null, "is-danger");
 			}
 		});
 	});
@@ -366,7 +366,7 @@ async function selectServerItem(e) {
 	}
 	if (harmony.selectedServer == e.target.getAttribute("name")) {
 		//same server we already selected...
-		showToast("Already viewing this server");
+		uiManager.showToast("Already viewing this server");
 		return;
 	}
 	if (e.target.getAttribute("name") == "HARMONY-ADD-SERVER") {
@@ -445,7 +445,7 @@ async function storePrefs() {
 	const accentColorEl = document.getElementById("accentColor");
 	if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(accentColorEl.value)) {
 		validateField(accentColorEl);
-		showToast(`${accentColorEl.value} is not a valid hex color code`);
+		uiManager.showToast(`${accentColorEl.value} is not a valid hex color code`);
 		return false;
 	}
 	harmony.localPrefs.settings.accentColor = accentColorEl.value;
@@ -455,12 +455,12 @@ async function storePrefs() {
 	const usernameEl = document.getElementById("username");
 	if (!usernameEl.value) {
 		validateField(usernameEl);
-		showToast("Username can't be empty dingus");
+		uiManager.showToast("Username can't be empty dingus");
 		return false;
 	}
 	if (usernameEl.length > 15) {
 		validateField(usernameEl);
-		showToast("Username can't be longer than 15 chars");
+		uiManager.showToast("Username can't be longer than 15 chars");
 		return false;
 	}
 
@@ -471,7 +471,7 @@ async function storePrefs() {
 		(passwordEl.value !== harmony.localPrefs.user.secret && !HarmonyUtils.isPasswordComplex(passwordEl.value))
 	) {
 		validateField(passwordEl);
-		showToast("Password must be at least 8 characters.");
+		uiManager.showToast("Password must be at least 8 characters.");
 		return false;
 	}
 
@@ -502,7 +502,7 @@ async function storePrefs() {
 
 		//if we are already connected/logged in with server
 		if (harmony.rtc) {
-			harmony.rtc.socket.emit(
+			window.socket.emit(
 				"setUser",
 				{
 					id: harmony.selfId,
@@ -517,7 +517,7 @@ async function storePrefs() {
 						window.electronAPI.loadPrefs(harmony.localPrefs);
 						return true;
 					} else {
-						showToast("Failed to update: " + res.error);
+						uiManager.showToast("Failed to update: " + res.error);
 						return false;
 					}
 				}
