@@ -141,7 +141,6 @@ function loadSettings(prefs) {
 	// Username
 	document.getElementById("username").value = prefs.user.username;
 	document.getElementById("userid").value = prefs.user.userId;
-	document.getElementById("password").value = prefs.user.password;
 
 	// Devices - populate dropdowns
 	populateDeviceDropdown("videoInputDevice", prefs.devices.videoInputDevices || [], prefs.devices.videoInputDevice);

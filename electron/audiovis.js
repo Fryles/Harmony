@@ -164,10 +164,12 @@ function colorSliderWithAudio(stream, sliderId, color = getRGB("var(--bulma-prim
 				background: linear-gradient(90deg, rgba(${color},1) ${percent}%, rgba(${color},0.2) ${percent + 1}%);
 			}
 		#hotMicThreshIcon{
-		${amp > rtc.hotMicThresh ? "color: var(--bulma-success) !important" : ""}
+		${amp > harmony.rtc.hotMicThresh ? "color: var(--bulma-success) !important" : ""}
 		}
 		`;
 		requestAnimationFrame(update);
 	}
 	update();
 }
+
+export { attachAudioVisualizer, colorSliderWithAudio, visualizeBorderWithAudio, getAudioAmplitude };

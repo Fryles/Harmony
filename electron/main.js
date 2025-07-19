@@ -28,7 +28,9 @@ function createWindow() {
 			contextIsolation: true,
 		},
 	});
-
+	// if (app.isPackaged) {
+	// 	mainWindow.removeMenu();
+	// }
 	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
 		if (url.startsWith("hrmny::") || url.startsWith("HRMNY::")) {
 			return { action: "allow" };

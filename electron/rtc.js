@@ -1,5 +1,6 @@
 import { harmony } from "./harmony.js";
-import { userUtils, uiManager } from "./harmony-lib.js";
+import { userUtils, uiManager, HarmonyUtils } from "./harmony-lib.js";
+import { visualizeBorderWithAudio, getAudioAmplitude } from "./audiovis.js";
 class rtcInterface {
 	constructor() {
 		this.signalingChannel = null; //channel we are currently signaling on
@@ -71,7 +72,7 @@ class rtcInterface {
 			}
 			data.peers.forEach((peerId) => {
 				//if not in global harmony.userCache, emit to server to get username
-				userUtils.checkUserCache(peerId);
+				userUtils.checkUsernameCache(peerId);
 				if (type == "voice") {
 					this.startVoiceConnection(peerId);
 				} else if (type == "chat") {
@@ -93,7 +94,7 @@ class rtcInterface {
 			console.log(`${newPeer} joined channel ${data.channel}`);
 
 			//if not in global harmony.userCache, emit to server to get username
-			userUtils.checkUserCache(newPeer);
+			userUtils.checkUsernameCache(newPeer);
 
 			//add channel to peer
 			this.peerChannels[newPeer] = this.peerChannels[newPeer] || [];
@@ -121,7 +122,7 @@ class rtcInterface {
 				} else {
 					console.warn("No local audio when peer joined our vc");
 				}
-				addVoiceUser(newPeer);
+				this.addVoiceUser(newPeer);
 			}
 		});
 
@@ -216,10 +217,10 @@ class rtcInterface {
 		e.classList.toggle("fa-microphone-slash");
 		e.classList.toggle("has-text-primary");
 		e.classList.toggle("has-text-danger");
-		if (window.rtc.localAudioStream) {
-			window.rtc._inputGainNode.gain.value = e.classList.contains("fa-microphone-slash")
+		if (harmony.rtc.localAudioStream) {
+			harmony.rtc._inputGainNode.gain.value = e.classList.contains("fa-microphone-slash")
 				? 0
-				: window.rtc.inputGainValue;
+				: harmony.rtc.inputGainValue;
 		}
 	}
 
@@ -254,15 +255,15 @@ class rtcInterface {
 		setVoiceUIState("idle");
 		//send courtesy dataChannel message to remove yourself for any chat only peers
 
-		//check if currentChat != our chat converted mediachannel (viewing diff channel then on vc with)
-		if (currentChat != setChannelType(this.mediaChannel, "chat")) {
-			//if so we should clear vc and see if anyone is in the currentchats vc
+		//check if harmony.currentChat != our chat converted mediachannel (viewing diff channel then on vc with)
+		if (harmony.currentChat != setChannelType(this.mediaChannel, "chat")) {
+			//if so we should clear vc and see if anyone is in the harmony.currentchats vc
 			// Clear all .voice-prof elements in #voice-list
 			const voiceList = document.getElementById("voice-list");
 			if (voiceList) {
 				voiceList.querySelectorAll(".voice-prof").forEach((el) => el.remove());
 			}
-			socket.emit("channelQuery", setChannelType(currentChat, "voice"), (res) => {
+			socket.emit("channelQuery", setChannelType(harmony.currentChat, "voice"), (res) => {
 				//check if anyone is in new channels vc
 				console.log(res);
 				if (res.length > 0) {
@@ -286,7 +287,7 @@ class rtcInterface {
 			this.ring.audio.currentTime = 0;
 			this.ring.audio = null;
 			clearTimeout(this.ring.timeout);
-			if (this.ring.type == "incoming voice" && setChannelType(currentChat, "voice") != this.ring.channel) {
+			if (this.ring.type == "incoming voice" && setChannelType(harmony.currentChat, "voice") != this.ring.channel) {
 				//ring to us is ending and we are not in the channel it was on
 				removeVoiceUser(this.ring.from);
 			}
@@ -311,7 +312,7 @@ class rtcInterface {
 			//stop any existing incoming ring
 			this.voiceRingEnd();
 			//switch ui to view the channel we are joining
-			if (setChannelType(currentChat, "voice") != channel) {
+			if (setChannelType(harmony.currentChat, "voice") != channel) {
 				//if we are not in the channel we are joining, switch to it
 				const server = (harmony.localPrefs.servers || []).find((s) => s.secret === channel.split(":")[1]);
 				const friend = (harmony.localPrefs.friends || []).find((f) => f.chat === channel.split(":")[1]);
@@ -338,7 +339,7 @@ class rtcInterface {
 		//change color of call button and stop anims
 		setVoiceUIState("inCall", channel);
 		//add ourselves to ui
-		addVoiceUser(harmony.selfId);
+		this.addVoiceUser(harmony.selfId);
 		this.joinChannel(channel);
 	}
 
@@ -408,7 +409,7 @@ class rtcInterface {
 		} else if (this.mediaChannel) {
 			//ALREADY IN VC
 			const server = harmony.localPrefs.servers.find((s) => s.secret === msg.channel.split(":")[1]);
-			const user = userLookup(msg.user);
+			const user = userUtils.userLookup(msg.user);
 
 			if (server) {
 				uiManager.showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
@@ -440,9 +441,9 @@ class rtcInterface {
 		this.ring.audio.play();
 		//add our caller to the ui and play anims
 		setVoiceUIState("ringing");
-		addVoiceUser(msg.user);
+		this.addVoiceUser(msg.user);
 		const server = harmony.localPrefs.servers.find((s) => s.id === msg.channel.split(":")[1]);
-		const user = userLookup(msg.user);
+		const user = userUtils.userLookup(msg.user);
 		if (server) {
 			uiManager.showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
 				const serverElem = document.querySelector(`.server-item[name="${server.id}"]`);
@@ -645,7 +646,7 @@ class rtcInterface {
 				if (dc && dc.readyState === "open") {
 					dc.send(JSON.stringify(msg));
 				} else {
-					console.log(`message not sent to ${peerId}`);
+					console.log(`message not sent to ${peerId}: ${dc}`);
 					uiManager.showToast("Error sending msg...");
 				}
 			}
@@ -903,6 +904,40 @@ class rtcInterface {
 			uiManager.showToast("Missing Audio Input Device");
 		}
 	}
+
+	addVoiceUser(userId) {
+		//check if user already Added
+		if (document.getElementById(userId)) {
+			console.warn(`User ${userId} already added to voice UI`);
+			return;
+		}
+		//add specified user to ui
+		const voiceUser = document.createElement("div");
+		voiceUser.classList.add("voice-prof");
+		//name in bubble can only be 5 chars
+		let name = userUtils.userLookup(userId);
+		name = name.nick ? name.nick : name.name;
+
+		if (name.includes(" ") && name.length > 5) {
+			//split two part name into two 2 char initials
+			name = name.split(" ");
+			name = name[0].substring(0, 2) + " " + name[1].substring(0, 2);
+		} else if (name.length > 5) {
+			name = name.substring(0, 5);
+		}
+		voiceUser.innerHTML = DOMPurify.sanitize(name);
+		voiceUser.id = userId;
+		voiceUser.addEventListener("click", (e) => {
+			manageVoiceUser(e);
+		});
+		if (userUtils.userCache[userId] && userUtils.userCache[userId].color) {
+			voiceUser.style.backgroundColor = userUtils.userCache[userId].color;
+			voiceUser.style.color = HarmonyUtils.getBestTextColor(userUtils.userCache[userId].color);
+		}
+		document.getElementById("voice-list").appendChild(voiceUser);
+		//add talking animation
+		if (userId == harmony.selfId) visualizeBorderWithAudio(harmony.rtc.localAudioStream, userId);
+	}
 }
 export default rtcInterface;
 
@@ -955,7 +990,7 @@ function setVoiceUIState(state, id = "") {
 		case "ringing":
 			mute.classList.remove("is-hidden");
 			vcEl.classList.add("ringing");
-			if (rtc.ring.type == "incoming voice") {
+			if (harmony.rtc.ring.type == "incoming voice") {
 				// If incoming ring, add pickup hover
 				vcEl.classList.add("pickup");
 			}
@@ -1035,40 +1070,6 @@ function setChannelType(channel, type) {
 	} else {
 		console.error("Attempted to set type on invalid channel: ", channel);
 	}
-}
-
-function addVoiceUser(userId) {
-	//check if user already Added
-	if (document.getElementById(userId)) {
-		console.warn(`User ${userId} already added to voice UI`);
-		return;
-	}
-	//add specified user to ui
-	const voiceUser = document.createElement("div");
-	voiceUser.classList.add("voice-prof");
-	//name in bubble can only be 5 chars
-	let name = userLookup(userId);
-	name = name.nick ? name.nick : name.name;
-
-	if (name.includes(" ") && name.length > 5) {
-		//split two part name into two 2 char initials
-		name = name.split(" ");
-		name = name[0].substring(0, 2) + " " + name[1].substring(0, 2);
-	} else if (name.length > 5) {
-		name = name.substring(0, 5);
-	}
-	voiceUser.innerHTML = DOMPurify.sanitize(name);
-	voiceUser.id = userId;
-	voiceUser.addEventListener("click", (e) => {
-		manageVoiceUser(e);
-	});
-	if (userColors[userId]) {
-		voiceUser.style.backgroundColor = userColors[userId];
-		voiceUser.style.color = HarmonyUtils.getBestTextColor(userColors[userId]);
-	}
-	document.getElementById("voice-list").appendChild(voiceUser);
-	//add talking animation
-	if (userId == harmony.selfId) visualizeBorderWithAudio(rtc.localAudioStream, userId);
 }
 
 function removeVoiceUser(userId) {

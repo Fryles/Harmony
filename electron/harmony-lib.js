@@ -1,4 +1,5 @@
 import { harmony } from "./harmony.js";
+import { colorSliderWithAudio } from "./audiovis.js";
 
 // Utility class for helper functions
 class HarmonyUtils {
@@ -32,6 +33,11 @@ class HarmonyUtils {
 		const select = document.getElementById(selectId);
 		const deviceId = select.value;
 		return devices.find((d) => d.deviceId === deviceId) || null;
+	}
+
+	static getRandomHexColor() {
+		const hex = Math.floor(Math.random() * 0xffffff).toString(16);
+		return `#${hex.padStart(6, "0")}`;
 	}
 
 	static getBestTextColor(hexColor) {
@@ -474,9 +480,8 @@ class chatManager {
 
 		// Track user data
 		if (msg.user && msg.username) {
-			if (userUtils.userCache[msg.user].name !== msg.username) {
-				userUtils.userCache[msg.user].name = msg.username;
-				saveUserCache();
+			if (userUtils.userCache) {
+				userUtils.updateUserCache(msg.user, { name: msg.username, color: msg.color });
 			}
 			// If msg.user is in our friends, update prefs with new user name
 			if (harmony.localPrefs.friends) {
@@ -687,6 +692,15 @@ class userUtils {
 		return { name: window.electronAPI.getPsuedoUser(userId), nick: "" };
 	}
 
+	static updateUserCache(userId, data) {
+		data.timestamp = Date.now();
+		if (!this.userCache[userId]) {
+			this.userCache[userId] = data;
+		} else {
+			Object.assign(this.userCache[userId], data);
+		}
+	}
+
 	// Load userCache from localStorage on startup
 	static loadUserCache() {
 		try {
@@ -704,7 +718,8 @@ class userUtils {
 		localStorage.setItem("userCache", JSON.stringify(this.userCache));
 	}
 
-	static checkUserCache(userId) {
+	//gets username preemptively or if cache is to old
+	static checkUsernameCache(userId) {
 		if (
 			!this.userCache[userId] ||
 			(this.userCache[userId] && this.userCache[userId].timestamp < Date.now() - this.userCacheTTL)
@@ -714,6 +729,9 @@ class userUtils {
 				if (username) {
 					this.userCache[userId] = { name: username, timestamp: Date.now() };
 					// Save the updated cache to local storage
+					if (!this.userCache[userId].color) {
+						this.userCache[userId].color = HarmonyUtils.getRandomHexColor();
+					}
 					this.saveUserCache();
 					console.log(`Cached username for ${userId}: ${username}`);
 				} else {

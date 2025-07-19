@@ -14,6 +14,8 @@ export const harmony = {
 	rtc: null,
 	dev: false,
 };
+//for dev rn
+window.harmony = harmony;
 const dev = harmony.dev;
 
 init();
@@ -62,6 +64,8 @@ async function init() {
 		if (await storePrefs()) {
 			uiManager.closeModals();
 			uiManager.showToast("Saved Preferences");
+		} else {
+			console.warn("saving prefs failed in storePrefs()");
 		}
 	});
 	document.getElementById("add-server").addEventListener("click", () => {
@@ -429,7 +433,7 @@ async function selectServerItem(e) {
 			if (res.length > 0) {
 				//add to vc ui and maybe update harmony.rtc channels?? shouldnt be needed i thinks
 				res.forEach((user) => {
-					addVoiceUser(user);
+					harmony.rtc.addVoiceUser(user);
 				});
 			}
 		});
@@ -466,10 +470,7 @@ async function storePrefs() {
 
 	const passwordEl = document.getElementById("password");
 	// Password complexity check for user password
-	if (
-		!passwordEl.value ||
-		(passwordEl.value !== harmony.localPrefs.user.secret && !HarmonyUtils.isPasswordComplex(passwordEl.value))
-	) {
+	if (passwordEl.value && !HarmonyUtils.isPasswordComplex(passwordEl.value)) {
 		validateField(passwordEl);
 		uiManager.showToast("Password must be at least 8 characters.");
 		return false;
@@ -485,22 +486,15 @@ async function storePrefs() {
 	harmony.localPrefs.audio.enableNoiseSuppression = getChk("enableNoiseSuppression");
 
 	//if user or pass changed, let server know
-
-	let newPass = passwordEl.value;
-	let newSecret = await hashbrown(`${harmony.selfId}:${newPass}`);
-	if (harmony.localPrefs.user.secret != newSecret || harmony.localPrefs.user.username != usernameEl.value) {
-		if (newPass === "" || newPass === null || newPass === undefined) {
-			//if no new pass, use old one
-			if (harmony.localPrefs.user.secret) {
-				newSecret = harmony.localPrefs.user.secret;
-			} else {
-				//harmony.localprefs secret is somehow invalid, probably bug or user being a dingus
-				uiManager.showToast("Error, please update password");
-				return;
-			}
-		}
-
-		//if we are already connected/logged in with server
+	let newSecret = passwordEl.value
+		? await hashbrown(`${harmony.selfId}:${passwordEl.value}`)
+		: harmony.localPrefs.user.secret;
+	if (
+		(newSecret && harmony.localPrefs.user.secret != newSecret) ||
+		harmony.localPrefs.user.username != usernameEl.value
+	) {
+		//either usename or pass changed, need to tell sovo
+		//on first settings save, there is no rtc connection, so check
 		if (harmony.rtc) {
 			window.socket.emit(
 				"setUser",
