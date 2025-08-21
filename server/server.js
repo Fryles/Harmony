@@ -235,13 +235,8 @@ io.on("connection", (socket) => {
 		const targetPeer = connections[peerId];
 		message.channel = channel;
 		if (targetPeer) {
-			const targetSocket = io.sockets.sockets.get(targetPeer.socketId);
-			if (targetSocket && targetSocket.rooms.has(channel)) {
-				io.to(targetPeer.socketId).emit("message", message);
-				console.log("sent message to peer", peerId, "in channel", channel);
-			} else {
-				console.log(`Peer ${peerId} is not in channel ${channel}`);
-			}
+			io.to(targetPeer.socketId).emit("message", message);
+			console.log("sent message to peer", peerId, "in channel", channel);
 		} else {
 			console.log(`Peer ${peerId} not found`);
 		}
