@@ -646,7 +646,9 @@ class rtcInterface {
 				if (dc && dc.readyState === "open") {
 					dc.send(JSON.stringify(msg));
 				} else {
-					console.log(`message not sent to ${peerId}: ${dc}`);
+					console.log(`message not sent to ${peerId}:`);
+					console.log(dc);
+
 					uiManager.showToast("Error sending msg...");
 				}
 			}

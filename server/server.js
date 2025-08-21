@@ -9,8 +9,10 @@ import crypto from "crypto";
 import { instrument } from "@socket.io/admin-ui";
 import { JSDOM } from "jsdom";
 import DOMPurify from "dompurify";
+import dotenv from "dotenv";
 
 // ENVIRONMENT VARIABLES
+dotenv.config({ path: "./main.env" });
 const PORT = process.env.PORT || 3000;
 
 // SETUP SERVERS
@@ -24,8 +26,7 @@ const io = new socketio(server, {
 	},
 });
 instrument(io, {
-	auth: false,
-	mode: "development",
+	auth: { type: "basic", username: process.env.SOCKETIO_ADMIN_USER, password: process.env.SOCKETIO_ADMIN_PWD_HASH },
 });
 
 // DB
@@ -237,6 +238,7 @@ io.on("connection", (socket) => {
 			const targetSocket = io.sockets.sockets.get(targetPeer.socketId);
 			if (targetSocket && targetSocket.rooms.has(channel)) {
 				io.to(targetPeer.socketId).emit("message", message);
+				console.log("sent message to peer", peerId, "in channel", channel);
 			} else {
 				console.log(`Peer ${peerId} is not in channel ${channel}`);
 			}

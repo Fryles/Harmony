@@ -14,6 +14,7 @@
 		"@socket.io/admin-ui": "^0.5.1",
 		"cors": "^2.8.5",
 		"dompurify": "^3.2.6",
+		"dotenv": "^17.2.1",
 		"express": "^4.17.1",
 		"jsdom": "^26.1.0",
 		"lowdb": "^7.0.1",
