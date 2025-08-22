@@ -27,6 +27,7 @@ const io = new socketio(server, {
 });
 instrument(io, {
 	auth: { type: "basic", username: process.env.SOCKETIO_ADMIN_USER, password: process.env.SOCKETIO_ADMIN_PWD_HASH },
+	mode: "development",
 });
 
 // DB
@@ -238,7 +239,7 @@ io.on("connection", (socket) => {
 			const targetSocket = io.sockets.sockets.get(targetPeer.socketId);
 			if (targetSocket && targetSocket.rooms.has(channel)) {
 				io.to(targetPeer.socketId).emit("message", message);
-				console.log(message);
+				//console.log(message);
 			} else {
 				console.log(`Peer ${peerId} is not in channel ${channel}`);
 			}
