@@ -57,10 +57,6 @@ class rtcInterface {
 			//ran after we join a new channel or rejoin one
 			console.log("Welcome: ", data);
 
-			if (this.signalingChannel != data.channel) {
-				console.warn("Got welcome on channel we are not signaling on???");
-			}
-
 			data.peers = data.peers.filter((peerId) => peerId !== harmony.selfId);
 			// Extract type from data.channel (format: "type:channelName")
 			const [type] = data.channel ? data.channel.split(":") : [null];
@@ -74,9 +70,9 @@ class rtcInterface {
 				//if not in global harmony.userCache, emit to server to get username
 				userUtils.checkUsernameCache(peerId);
 				if (type == "voice") {
-					this.startVoiceConnection(peerId);
+					this.startVoiceConnection(peerId, data.channel);
 				} else if (type == "chat") {
-					this.startChatConnection(peerId);
+					this.startChatConnection(peerId, data.channel);
 				} else if (type == "video") {
 				} else {
 					console.warn("bad typed channel coming back from server... its confused.");
@@ -169,7 +165,7 @@ class rtcInterface {
 			const peerId = data.from;
 			switch (data.msg.type) {
 				case "offer":
-					this.handleOffer(peerId, data.msg.offer);
+					this.handleOffer(peerId, data.msg.offer, data.channel);
 					break;
 				case "candidate":
 					this.handleCandidate(peerId, data.msg.candidate);
@@ -501,9 +497,8 @@ class rtcInterface {
 			}
 			this.mediaChannel = newChannel;
 		}
-		this.signalingChannel = newChannel; //set signalingchannel before we start connection process
 		this.socket.emit("joinChannel", newChannel);
-		console.log("joined ", this.signalingChannel);
+		console.log("joined ", newChannel);
 	}
 
 	leaveChannel(channel) {
@@ -548,15 +543,15 @@ class rtcInterface {
 		console.log("broadcast leaveChannel on ", channel);
 	}
 
-	startVoiceConnection(peerId) {
+	startVoiceConnection(peerId, channel) {
 		const pc = this.peerConnections[peerId];
 		if (!pc) {
 			console.error("No existing peer connection to start voice from...");
 			return;
 		}
 		this.peerChannels[peerId] = this.peerChannels[peerId] || [];
-		if (!this.peerChannels[peerId].includes(this.signalingChannel)) {
-			this.peerChannels[peerId].push(this.signalingChannel);
+		if (!this.peerChannels[peerId].includes(channel)) {
+			this.peerChannels[peerId].push(channel);
 		}
 		// If we already have a remote audio stream for this peer, don't add again
 		if (this.remoteAudioStreams[peerId]) {
@@ -587,7 +582,7 @@ class rtcInterface {
 			try {
 				const offer = await pc.createOffer({ offerToReceiveAudio: true });
 				await pc.setLocalDescription(offer);
-				this.sendSignalingMessage(this.signalingChannel, peerId, {
+				this.sendSignalingMessage(channel, peerId, {
 					type: "offer",
 					offer: pc.localDescription,
 				});
@@ -597,7 +592,7 @@ class rtcInterface {
 		};
 	}
 
-	startChatConnection(peerId) {
+	startChatConnection(peerId, channel) {
 		if (this.dataChannels[peerId]) {
 			//already have dataChannel connection... return
 			console.log("Chat - Attempted to connect to existing peer");
@@ -606,8 +601,8 @@ class rtcInterface {
 
 		const pc = this.peerConnections[peerId] ? this.peerConnections[peerId] : new RTCPeerConnection(this.rtcConfig);
 		this.peerChannels[peerId] = this.peerChannels[peerId] || [];
-		if (!this.peerChannels[peerId].includes(this.signalingChannel)) {
-			this.peerChannels[peerId].push(this.signalingChannel);
+		if (!this.peerChannels[peerId].includes(channel)) {
+			this.peerChannels[peerId].push(channel);
 		}
 
 		if (!this.peerConnections[peerId]) {
@@ -621,7 +616,7 @@ class rtcInterface {
 
 		pc.onicecandidate = (event) => {
 			if (event.candidate) {
-				this.sendSignalingMessage(this.signalingChannel, peerId, {
+				this.sendSignalingMessage(channel, peerId, {
 					type: "candidate",
 					candidate: event.candidate,
 				});
@@ -631,7 +626,7 @@ class rtcInterface {
 		pc.createOffer()
 			.then((offer) => pc.setLocalDescription(offer))
 			.then(() => {
-				this.sendSignalingMessage(this.signalingChannel, peerId, {
+				this.sendSignalingMessage(channel, peerId, {
 					type: "offer",
 					offer: pc.localDescription,
 				});
@@ -656,12 +651,11 @@ class rtcInterface {
 	}
 
 	setupDataChannel(peerId, dc) {
-		const dcChannel = this.signalingChannel;
 		dc.onopen = () => {
-			console.log(`Data channel: ${dcChannel} open with ${peerId}`);
+			console.log(`Data channel: ${dc} open with ${peerId}`);
 		};
 		dc.onclose = () => {
-			console.log(`Data channel: ${dcChannel} closed with ${peerId}`);
+			console.log(`Data channel: ${dc} closed with ${peerId}`);
 			if (this.peerChannels[peerId]) {
 				this.peerChannels[peerId] = this.peerChannels[peerId].filter((ch) => ch !== dcChannel);
 			}
@@ -702,18 +696,20 @@ class rtcInterface {
 		this.socket.emit("message", channel, peerId, {
 			from: harmony.selfId,
 			target: peerId,
+			channel: channel,
 			msg,
 		});
 	}
 
-	handleOffer(peerId, offer) {
+	handleOffer(peerId, offer, channel) {
 		const pc = this.peerConnections[peerId] ? this.peerConnections[peerId] : new RTCPeerConnection(this.rtcConfig);
 		this.peerChannels[peerId] = this.peerChannels[peerId] || [];
-		if (!this.peerChannels[peerId].includes(this.signalingChannel)) {
-			this.peerChannels[peerId].push(this.signalingChannel);
-		}
+
 		if (!this.peerConnections[peerId]) {
 			this.peerConnections[peerId] = pc;
+		}
+		if (!this.peerChannels[peerId].includes(this.signalingChannel)) {
+			this.peerChannels[peerId].push(this.signalingChannel);
 		}
 
 		// If the offer is for audio (voice), add local audio tracks
@@ -745,7 +741,7 @@ class rtcInterface {
 
 		pc.onicecandidate = (event) => {
 			if (event.candidate) {
-				this.sendSignalingMessage(this.signalingChannel, peerId, {
+				this.sendSignalingMessage(event.channel, peerId, {
 					type: "candidate",
 					candidate: event.candidate,
 				});
@@ -762,7 +758,7 @@ class rtcInterface {
 				.then(() => pc.createAnswer())
 				.then((answer) => pc.setLocalDescription(answer))
 				.then(() => {
-					this.sendSignalingMessage(this.signalingChannel, peerId, {
+					this.sendSignalingMessage(channel, peerId, {
 						type: "answer",
 						answer: pc.localDescription,
 					});

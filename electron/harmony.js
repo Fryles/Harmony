@@ -12,7 +12,7 @@ export const harmony = {
 	friendReqs: { incoming: [], outgoing: [] },
 	selfId: null,
 	rtc: null,
-	dev: false,
+	dev: true,
 };
 //for dev rn
 window.harmony = harmony;

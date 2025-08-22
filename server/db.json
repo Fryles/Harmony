@@ -12,6 +12,18 @@
       "secret": "f86fd27c170cbe8f67f5ece71cd059b5176f709ba1c262fda61ccfc5017429da",
       "session": "522cb92f0bf83e8f9cc072bf07ee3f3a",
       "sessionTimestamp": 1752763513025
+    },
+    "735ea16a-ce96-4d80-8499-c57f9e812502": {
+      "name": "Epic Dog",
+      "secret": "da9687649e3e2857040af9bd3bd03a31b4a476696ed5f40edc828cf4dea20ac8",
+      "session": "f6cb3b7f391f27413e9191abe665ec82",
+      "sessionTimestamp": 1755882324013
+    },
+    "a150e6b4-a897-4424-8cbc-be228316a143": {
+      "name": "Pog Dog",
+      "secret": "65a475d62a07f7668e244d5d96fbffc651f94b889596cf36153f6a1c00f851c6",
+      "session": "b361ea162e0dec7bda5e2788237e7115",
+      "sessionTimestamp": 1755882462805
     }
   },
   "ips": {},
@@ -38,7 +50,32 @@
         "serverStoredMessaging": true
       },
       "admin": "f842a398-9470-4644-8165-64aad570267f",
-      "messages": []
+      "messages": [
+        {
+          "timestamp": 1755882333822,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "dd",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755882473515,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "hi",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755882478552,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "yo",
+          "type": "text",
+          "color": "#3bdbcd"
+        }
+      ]
     },
     "test3": {
       "name": "test3",
