@@ -758,15 +758,15 @@ class uiManager {
 		$target.classList.add("is-active");
 	}
 
-	static attatchModalHandlers() {
+	static attachModalHandlers() {
 		//opens
 		var $modalButtons = this.getAll(".modal-button");
 		if ($modalButtons.length > 0) {
 			$modalButtons.forEach(function ($el) {
 				$el.addEventListener("click", async function () {
 					var target = $el.dataset.target;
-					uiManager.openModal(target);
 					if (target == "settings-modal") {
+						harmony.localPrefs = await window.electronAPI.refreshSettings(harmony.localPrefs);
 						if (!harmony.rtc.localAudioStream) {
 							await harmony.rtc._initLocalAudio();
 						}
@@ -774,6 +774,7 @@ class uiManager {
 							colorSliderWithAudio(harmony.rtc.unProcessedLocalAudio, "hotMicThresh");
 						}
 					}
+					uiManager.openModal(target);
 				});
 			});
 		}

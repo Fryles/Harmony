@@ -14,6 +14,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	getPrefs: (accId) => ipcRenderer.invoke("get-prefs", accId),
 	loadPrefs: (prefs) => loadPrefs(prefs),
 	getPsuedoUser: (userId) => psuedoUser(userId),
+	refreshSettings: (prefs) => {
+		autoUpdateDevices(prefs).then((updatedPrefs) => {
+			prefs = updatedPrefs;
+			loadSettings(prefs);
+			ipcRenderer.send("update-prefs", prefs, accId);
+		});
+		return prefs;
+	},
 });
 
 // load prefs here
@@ -64,6 +72,7 @@ function loadServers(prefs) {
 			name = name.substring(0, 5);
 		}
 		el.innerText = name;
+
 		serverList.appendChild(el);
 	});
 
@@ -91,7 +100,7 @@ function defaultPrefs() {
 		servers: [],
 		settings: {
 			theme: "dark",
-			accentColor: "#3bdbcd",
+			accentColor: "#e4956bff",
 			language: "en-US",
 			notifications: true,
 			checkUpdate: true,
@@ -180,14 +189,16 @@ async function autoUpdateDevices(prefs) {
 		var audioOutputDevice = audioOutputDevices[0];
 
 		//store the devices in prefs.json
+
 		prefs.devices = {
 			videoInputDevices: videoInputDevices,
 			audioInputDevices: audioInputDevices,
 			audioOutputDevices: audioOutputDevices,
-			videoInputDevice: videoInputDevice,
-			audioInputDevice: audioInputDevice,
-			audioOutputDevice: audioOutputDevice,
+			videoInputDevice: prefs.devices.videoInputDevice || videoInputDevice || "",
+			audioInputDevice: prefs.devices.audioInputDevice || audioInputDevice || "",
+			audioOutputDevice: prefs.devices.audioOutputDevice || audioOutputDevice || "",
 		};
+
 		return prefs;
 	});
 }

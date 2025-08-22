@@ -926,7 +926,7 @@ class rtcInterface {
 		voiceUser.innerHTML = DOMPurify.sanitize(name);
 		voiceUser.id = userId;
 		voiceUser.addEventListener("click", (e) => {
-			manageVoiceUser(e);
+			uiManager.manageVoiceUser(e);
 		});
 		if (userUtils.userCache[userId] && userUtils.userCache[userId].color) {
 			voiceUser.style.backgroundColor = userUtils.userCache[userId].color;

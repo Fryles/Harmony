@@ -33,7 +33,7 @@
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#3bdbcd",
+    "accentColor": "#9bdbfd",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true,
@@ -57,68 +57,58 @@
       {
         "deviceId": "default",
         "kind": "audioinput",
-        "label": "Default - Microphone (Razer BlackShark V2 Pro)"
+        "label": "Default - Myle pods (Bluetooth)"
       },
       {
-        "deviceId": "communications",
+        "deviceId": "76a99ee2f3660b6531a19c778271fec1ed6235beb3d06ac925286d5e2989f7a6",
         "kind": "audioinput",
-        "label": "Communications - Microphone (Razer BlackShark V2 Pro)"
-      },
-      {
-        "deviceId": "13610fa941a49f02ed2e72808a0ba51f95c4ae24ec90c56beb79852b1139a409",
-        "kind": "audioinput",
-        "label": "Microphone (Steam Streaming Microphone)"
-      },
-      {
-        "deviceId": "0a18fffb52ddf0e8d87b50085903215c635b67ab8bb3380b5ab936a9c78b49bb",
-        "kind": "audioinput",
-        "label": "Microphone (Razer BlackShark V2 Pro)"
+        "label": "Myle pods (Bluetooth)"
       }
     ],
     "audioOutputDevices": [
       {
         "deviceId": "default",
         "kind": "audiooutput",
-        "label": "Default - Speakers (Razer BlackShark V2 Pro)"
+        "label": "Default - Myle pods (Bluetooth)"
       },
       {
-        "deviceId": "communications",
+        "deviceId": "ee0edfd3c8fa1495b4c04ed21bcbfcccf1fcbb6d73e605180be031c2d6af40d6",
         "kind": "audiooutput",
-        "label": "Communications - Speakers (Razer BlackShark V2 Pro)"
+        "label": "Myle pods (Bluetooth)"
       },
       {
-        "deviceId": "94a37fbc1d4004dea9937afd100231afeded24fa136aa4575b621aee8dfe2236",
+        "deviceId": "3825d5b1e40ce8679607ce39c6742e43370a6df6383fda3e807b36b3b7afd74e",
         "kind": "audiooutput",
-        "label": "Speakers (Steam Streaming Speakers)"
+        "label": "HP 24mh (HDMI)"
       },
       {
-        "deviceId": "b3400029e9a794e4a39f53e923a56213d6acbd8b198827e6985d99278e142b56",
+        "deviceId": "00fac35d78a6f9ab70b097b76f641f683089200361fed396a81f2910c22d93e9",
         "kind": "audiooutput",
-        "label": "Speakers (Razer BlackShark V2 Pro)"
+        "label": "HP 24mh (DisplayPort)"
       },
       {
-        "deviceId": "1853880c891119c299babc86f1abe9c3b5387152fb7f4c913e9999b7a201a016",
+        "deviceId": "f5443041a452f5f5a0bb78918d54687df252eb9117286d400fb42b73163d9ed2",
         "kind": "audiooutput",
-        "label": "Speakers (Steam Streaming Microphone)"
+        "label": "Mac mini Speakers (Built-in)"
       }
     ],
+    "videoInputDevice": null,
     "audioInputDevice": {
       "deviceId": "default",
       "kind": "audioinput",
-      "label": "Default - Microphone (Razer BlackShark V2 Pro)"
+      "label": "Default - Myle pods (Bluetooth)"
     },
     "audioOutputDevice": {
       "deviceId": "default",
       "kind": "audiooutput",
-      "label": "Default - Speakers (Razer BlackShark V2 Pro)"
-    },
-    "videoInputDevice": null
+      "label": "Default - Myle pods (Bluetooth)"
+    }
   },
   "audio": {
-    "inputGain": 1,
-    "outputVolume": 0.8,
-    "hotMicThresh": 0.1,
+    "inputGain": 0.53,
+    "outputVolume": 0.67,
+    "hotMicThresh": 0.03,
     "enableNoiseSuppression": true,
-    "ringVolume": 0.5
+    "ringVolume": 0.22
   }
 }

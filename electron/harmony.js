@@ -59,7 +59,7 @@ async function init() {
 	}
 
 	chatManager.chatInit(); //attathces input listeners for formatting and box expand
-	uiManager.attatchModalHandlers();
+	uiManager.attachModalHandlers();
 	document.getElementById("settings-save").addEventListener("click", async () => {
 		if (await storePrefs()) {
 			uiManager.closeModals();
@@ -88,6 +88,11 @@ async function init() {
 	const serverListObserver = new MutationObserver(() => {
 		document.querySelectorAll(".server-item").forEach((div) => {
 			div.addEventListener("click", selectServerItem, true);
+			if (div.getAttribute("name") == harmony.selectedServer) {
+				div.classList.add("selected");
+			} else {
+				div.classList.remove("selected");
+			}
 		});
 	});
 	serverListObserver.observe(document.getElementById("server-list"), {
@@ -446,6 +451,7 @@ async function storePrefs() {
 	const getVal = (id) => document.getElementById(id).value;
 	const getChk = (id) => document.getElementById(id).checked;
 
+	// validate accent color
 	const accentColorEl = document.getElementById("accentColor");
 	if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(accentColorEl.value)) {
 		validateField(accentColorEl);
@@ -456,68 +462,64 @@ async function storePrefs() {
 	harmony.localPrefs.settings.theme = getVal("theme");
 	harmony.localPrefs.settings.notifications = getChk("notifications");
 
+	// validate username
 	const usernameEl = document.getElementById("username");
 	if (!usernameEl.value) {
 		validateField(usernameEl);
 		uiManager.showToast("Username can't be empty dingus");
 		return false;
 	}
-	if (usernameEl.length > 15) {
+	if (usernameEl.value.length > 15) {
 		validateField(usernameEl);
 		uiManager.showToast("Username can't be longer than 15 chars");
 		return false;
 	}
 
+	// validate password
 	const passwordEl = document.getElementById("password");
-	// Password complexity check for user password
 	if (passwordEl.value && !HarmonyUtils.isPasswordComplex(passwordEl.value)) {
 		validateField(passwordEl);
 		uiManager.showToast("Password must be at least 8 characters.");
 		return false;
 	}
 
+	// device + audio prefs
 	["videoInputDevice", "audioInputDevice", "audioOutputDevice"].forEach((id) => {
 		harmony.localPrefs.devices[id] = HarmonyUtils.getSelectedDevice(id, harmony.localPrefs.devices[id + "s"]);
 	});
-
 	["inputGain", "outputVolume", "hotMicThresh", "ringVolume"].forEach((id) => {
 		harmony.localPrefs.audio[id] = parseFloat(getVal(id));
 	});
 	harmony.localPrefs.audio.enableNoiseSuppression = getChk("enableNoiseSuppression");
 
-	//if user or pass changed, let server know
-	let newSecret = passwordEl.value
+	// handle user/pass updates
+	const newSecret = passwordEl.value
 		? await hashbrown(`${harmony.selfId}:${passwordEl.value}`)
 		: harmony.localPrefs.user.secret;
-	if (
-		(newSecret && harmony.localPrefs.user.secret != newSecret) ||
-		harmony.localPrefs.user.username != usernameEl.value
-	) {
-		//either usename or pass changed, need to tell sovo
-		//on first settings save, there is no rtc connection, so check
+
+	const userChanged =
+		(newSecret && harmony.localPrefs.user.secret !== newSecret) ||
+		harmony.localPrefs.user.username !== usernameEl.value;
+
+	if (userChanged) {
 		if (harmony.rtc) {
-			window.socket.emit(
-				"setUser",
-				{
-					id: harmony.selfId,
-					name: usernameEl.value,
-					secret: newSecret,
-				},
-				(res) => {
+			// wrap socket emit in a promise so storePrefs can await it
+			return new Promise((resolve) => {
+				window.socket.emit("setUser", { id: harmony.selfId, name: usernameEl.value, secret: newSecret }, (res) => {
 					if (res.success) {
 						harmony.localPrefs.user.username = usernameEl.value;
 						harmony.localPrefs.user.secret = newSecret;
 						window.electronAPI.updatePrefs(harmony.localPrefs);
 						window.electronAPI.loadPrefs(harmony.localPrefs);
-						return true;
+						resolve(true);
 					} else {
 						uiManager.showToast("Failed to update: " + res.error);
-						return false;
+						resolve(false);
 					}
-				}
-			);
+				});
+			});
 		} else {
-			//no server connection, update ourselves only
+			// no server connection, update locally
 			harmony.localPrefs.user.username = usernameEl.value;
 			harmony.localPrefs.user.secret = newSecret;
 			window.electronAPI.updatePrefs(harmony.localPrefs);
@@ -525,7 +527,7 @@ async function storePrefs() {
 			return true;
 		}
 	} else {
-		//no user or pass change, just update local prefs
+		// just update local prefs
 		window.electronAPI.updatePrefs(harmony.localPrefs);
 		window.electronAPI.loadPrefs(harmony.localPrefs);
 		return true;

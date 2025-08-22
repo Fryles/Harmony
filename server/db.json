@@ -16,14 +16,14 @@
     "735ea16a-ce96-4d80-8499-c57f9e812502": {
       "name": "Epic Dog",
       "secret": "da9687649e3e2857040af9bd3bd03a31b4a476696ed5f40edc828cf4dea20ac8",
-      "session": "f6cb3b7f391f27413e9191abe665ec82",
-      "sessionTimestamp": 1755882324013
+      "session": "22a5fb1cf5c89fa22f45e6f235cfe6aa",
+      "sessionTimestamp": 1755884184608
     },
     "a150e6b4-a897-4424-8cbc-be228316a143": {
       "name": "Pog Dog",
       "secret": "65a475d62a07f7668e244d5d96fbffc651f94b889596cf36153f6a1c00f851c6",
-      "session": "b361ea162e0dec7bda5e2788237e7115",
-      "sessionTimestamp": 1755882462805
+      "session": "491215253c63a3d7f7a6038d2b0ccd1e",
+      "sessionTimestamp": 1755886659979
     }
   },
   "ips": {},
@@ -72,6 +72,62 @@
           "user": "a150e6b4-a897-4424-8cbc-be228316a143",
           "username": "Pog Dog",
           "content": "yo",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755884963685,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "asd",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755886306942,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "tewst",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755886311507,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "yo",
+          "type": "text",
+          "color": "#9bdbfd"
+        },
+        {
+          "timestamp": 1755886314066,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "hey",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755886758954,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "asd",
+          "type": "text",
+          "color": "#9bdbfd"
+        },
+        {
+          "timestamp": 1755886762150,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "hey",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755886795453,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "das",
           "type": "text",
           "color": "#3bdbcd"
         }
