@@ -3,7 +3,6 @@ import { userUtils, uiManager, HarmonyUtils } from "./harmony-lib.js";
 import { visualizeBorderWithAudio, getAudioAmplitude } from "./audiovis.js";
 class rtcInterface {
 	constructor() {
-		this.signalingChannel = null; //channel we are currently signaling on
 		//This is only changed for new connections
 		this.mediaChannel = null; //channel for video/voice
 		this.peerConnections = {};
@@ -23,33 +22,14 @@ class rtcInterface {
 		this.inputGainValue = harmony.localPrefs.audio.inputGain;
 		this.hotMicThresh = harmony.localPrefs.audio.hotMicThresh;
 
-		this._registerSocketEvents();
-		// Join all server and friend chats on startup
-		if (harmony.localPrefs) {
-			console.log(harmony.localPrefs);
-
-			// Join all server chats
-			if (Array.isArray(harmony.localPrefs.servers)) {
-				harmony.localPrefs.servers.forEach((server) => {
-					if (server.secret) {
-						this.joinChannel(`chat:${server.secret}`);
-					}
-				});
-			}
-			// Join all friend chats
-			if (Array.isArray(harmony.localPrefs.friends)) {
-				harmony.localPrefs.friends.forEach((friend) => {
-					if (friend.chat) {
-						this.joinChannel(`chat:${friend.chat}`);
-					}
-				});
-			}
-		}
+		this._initSocket();
 	}
 
-	_registerSocketEvents() {
+	_initSocket() {
+		//registers socket events and joins channels on load
 		if (!window.socket) {
-			setTimeout(this._registerSocketEvents, 1000);
+			console.error("No socket found for rtc, deferring... ");
+			setTimeout(() => this._initSocket(), 1000);
 		} else if (!this.socket && window.socket) {
 			this.socket = window.socket;
 		}
@@ -126,7 +106,7 @@ class rtcInterface {
 			//ran when a peer on a channel leaves
 
 			//remove channel from this peer
-			const peerId = data.peer;
+			const peerId = data.from;
 			if (this.peerChannels[peerId]) {
 				this.peerChannels[peerId] = this.peerChannels[peerId].filter((ch) => ch !== data.channel);
 			}
@@ -175,6 +155,28 @@ class rtcInterface {
 					break;
 			}
 		});
+
+		// Join all server and friend chats on startup
+		if (harmony.localPrefs) {
+			console.log(harmony.localPrefs);
+
+			// Join all server chats
+			if (Array.isArray(harmony.localPrefs.servers)) {
+				harmony.localPrefs.servers.forEach((server) => {
+					if (server.secret) {
+						this.joinChannel(`chat:${server.secret}`);
+					}
+				});
+			}
+			// Join all friend chats
+			if (Array.isArray(harmony.localPrefs.friends)) {
+				harmony.localPrefs.friends.forEach((friend) => {
+					if (friend.chat) {
+						this.joinChannel(`chat:${friend.chat}`);
+					}
+				});
+			}
+		}
 	}
 
 	callVoice(channel) {
@@ -234,6 +236,7 @@ class rtcInterface {
 			this.unProcessedLocalAudio = null;
 		}
 	}
+
 	VoiceHangup() {
 		this.stopLocalVoice();
 		if (this.mediaChannel) {
@@ -245,7 +248,6 @@ class rtcInterface {
 
 		if (this.ring) {
 			this.voiceRingEnd(); //stop ring if we are ending it early
-			this.ring = null;
 		}
 		removeVoiceUser(harmony.selfId);
 		setVoiceUIState("idle");
@@ -259,7 +261,7 @@ class rtcInterface {
 			if (voiceList) {
 				voiceList.querySelectorAll(".voice-prof").forEach((el) => el.remove());
 			}
-			socket.emit("channelQuery", setChannelType(harmony.currentChat, "voice"), (res) => {
+			this.socket.emit("channelQuery", setChannelType(harmony.currentChat, "voice"), (res) => {
 				//check if anyone is in new channels vc
 				console.log(res);
 				if (res.length > 0) {
@@ -267,7 +269,6 @@ class rtcInterface {
 				}
 			});
 		}
-		this.mediaChannel = null;
 	}
 
 	voiceRingEnd() {
@@ -438,7 +439,7 @@ class rtcInterface {
 		//add our caller to the ui and play anims
 		setVoiceUIState("ringing");
 		this.addVoiceUser(msg.user);
-		const server = harmony.localPrefs.servers.find((s) => s.id === msg.channel.split(":")[1]);
+		const server = harmony.localPrefs.servers.find((s) => s.secret === msg.channel.split(":")[1]);
 		const user = userUtils.userLookup(msg.user);
 		if (server) {
 			uiManager.showToast(`${user.nick ? user.nick : user.name} calling on ${server.name}`, () => {
@@ -502,6 +503,7 @@ class rtcInterface {
 	}
 
 	leaveChannel(channel) {
+		// technically we can leave any channel but this is only called on voice leave rn
 		const [type] = channel ? channel.split(":") : [null];
 		if (type == "voice" && this.mediaChannel == channel) {
 			if (this.localAudioStream) {
@@ -537,10 +539,11 @@ class rtcInterface {
 			setVoiceUIState("idle");
 			console.log(`Sending voiceLeave on ${this.mediaChannel}`);
 			this.sendMessage(msg, setChannelType(this.mediaChannel, "chat"));
+			this.mediaChannel = null;
 		}
 
 		this.socket.emit("leaveChannel", channel);
-		console.log("broadcast leaveChannel on ", channel);
+		console.log("broadcasted leaveChannel on ", channel);
 	}
 
 	startVoiceConnection(peerId, channel) {
@@ -652,12 +655,12 @@ class rtcInterface {
 
 	setupDataChannel(peerId, dc) {
 		dc.onopen = () => {
-			console.log(`Data channel: ${dc} open with ${peerId}`);
+			console.log(`Data channel: ${dc.label} open with ${peerId}`);
 		};
 		dc.onclose = () => {
-			console.log(`Data channel: ${dc} closed with ${peerId}`);
+			console.log(`Data channel: ${dc.label} closed with ${peerId}`);
 			if (this.peerChannels[peerId]) {
-				this.peerChannels[peerId] = this.peerChannels[peerId].filter((ch) => ch !== dcChannel);
+				this.peerChannels[peerId] = this.peerChannels[peerId].filter((ch) => ch !== dc.label);
 			}
 			if (this.dataChannels[peerId]) {
 				delete this.dataChannels[peerId];
@@ -682,6 +685,7 @@ class rtcInterface {
 							this.peerChannels[peerId] = this.peerChannels[peerId].filter((ch) => ch !== event.channel);
 						}
 					}
+					break;
 				case "videoRing":
 					//special param for starting vc, display ring/video ui
 					break;
@@ -708,8 +712,8 @@ class rtcInterface {
 		if (!this.peerConnections[peerId]) {
 			this.peerConnections[peerId] = pc;
 		}
-		if (!this.peerChannels[peerId].includes(this.signalingChannel)) {
-			this.peerChannels[peerId].push(this.signalingChannel);
+		if (!this.peerChannels[peerId].includes(channel)) {
+			this.peerChannels[peerId].push(channel);
 		}
 
 		// If the offer is for audio (voice), add local audio tracks
@@ -741,7 +745,7 @@ class rtcInterface {
 
 		pc.onicecandidate = (event) => {
 			if (event.candidate) {
-				this.sendSignalingMessage(event.channel, peerId, {
+				this.sendSignalingMessage(channel, peerId, {
 					type: "candidate",
 					candidate: event.candidate,
 				});
@@ -833,7 +837,7 @@ class rtcInterface {
 	}
 
 	setUserVolume(userID, volume) {
-		// Clamp volume between 0.0 and 1
+		// Clamp volume between 0.0 and 2
 		const vol = Math.max(0, Math.min(2, volume));
 		if (this.remoteAudioGainNodes && this.remoteAudioGainNodes[userID]) {
 			this.remoteAudioGainNodes[userID].gain.value = vol;
@@ -1062,11 +1066,16 @@ function setChannelType(channel, type) {
 	if (type != "chat" && type != "voice" && type != "video") {
 		console.error(`Attempted to set channel ${channel} with invalid type ${type}`);
 	}
+	if (!channel || typeof channel !== "string") {
+		console.error("called setChannelType with bad channel: ", channel);
+		return channel;
+	}
 	let base = channel.split(":")[1];
 	if (base) {
 		return `${type}:${base}`;
 	} else {
-		console.error("Attempted to set type on invalid channel: ", channel);
+		console.warn("setChannelType on non-typed channel: ", channel);
+		return `${type}:${channel}`;
 	}
 }
 

@@ -17,6 +17,7 @@ export const harmony = {
 //for dev rn
 window.harmony = harmony;
 const dev = harmony.dev;
+let lastLoopingToast = 0;
 
 init();
 
@@ -101,7 +102,7 @@ async function init() {
 	});
 
 	const friendsListObserver = new MutationObserver(() => {
-		if (harmony.localPrefs.friends.length > 0) {
+		if (harmony.localPrefs.friends && harmony.localPrefs.friends.length > 0) {
 			let firstFriend = document.getElementsByName(harmony.localPrefs.friends[0].id)[0];
 			if (firstFriend && !harmony.selectedFriend) {
 				FriendsManager.selectFriend(firstFriend);
@@ -168,7 +169,7 @@ async function init() {
 	if (harmony.localPrefs && harmony.localPrefs.servers) {
 		harmony.localPrefs.servers.forEach((server) => {
 			if (server.options && server.options.serverStoredMessaging) {
-				socket.emit("getServerMessages", server.id, since, (serverResponse) => {
+				window.socket.emit("getServerMessages", server.id, since, (serverResponse) => {
 					if (!serverResponse.success) {
 						console.error(`Failed to retrieve messages for server ${server.name}:`, serverResponse.error);
 						return;
@@ -263,7 +264,7 @@ async function registerServer() {
 		secret: secret,
 		options: options,
 	};
-	socket.emit("registerServer", sovo, (res) => {
+	window.socket.emit("registerServer", sovo, (res) => {
 		if (res.success) {
 			console.log(res);
 
@@ -272,28 +273,7 @@ async function registerServer() {
 			if (!harmony.localPrefs.servers) harmony.localPrefs.servers = [];
 			harmony.localPrefs.servers.push(res.server);
 			// Add server to UI before the "Add Server" button
-			const serverList = document.getElementById("server-list");
-			if (serverList) {
-				const addServerBtn = serverList.querySelector('.server-item[name="HARMONY-ADD-SERVER"]');
-				const serverDiv = document.createElement("div");
-				serverDiv.className = "server-item";
-				serverDiv.setAttribute("name", res.server.id);
-				let name = res.server.name;
-				if (name.includes(" ") && name.length > 5) {
-					//split two part name into two 2 char initials
-					name = name.split(" ");
-					name = name[0].substring(0, 2) + " " + name[1].substring(0, 2);
-				} else if (name.length > 5) {
-					name = name.substring(0, 5);
-				}
-				serverDiv.textContent = DOMPurify.sanitize(name);
-				serverDiv.addEventListener("click", selectServerItem, true);
-				if (addServerBtn) {
-					serverList.insertBefore(serverDiv, addServerBtn);
-				} else {
-					serverList.appendChild(serverDiv);
-				}
-			}
+			uiManager.insertServerToUI(res.server);
 			uiManager.closeModals();
 			window.electronAPI.updatePrefs(harmony.localPrefs);
 		} else {
@@ -314,40 +294,21 @@ function addServer() {
 	}
 
 	//query server exact to get id (could be real or fake)
-	socket.emit("serverQuery", name, true, async (res) => {
+	window.socket.emit("serverQuery", name, true, async (res) => {
 		res = res[0];
 		if (!res.id) {
 			uiManager.showToast(`Failed to join ${name}`, null, "is-danger");
 		}
 		const secret = await hashbrown(`server:${res.id}:${pwd}`);
-		socket.emit("serverAuth", name, res.id, secret, (res) => {
+		window.socket.emit("serverAuth", name, res.id, secret, (res) => {
 			if (res) {
 				// good auth, add server to prefs and connect
 				if (!harmony.localPrefs.servers) harmony.localPrefs.servers = [];
 				harmony.localPrefs.servers.push(res);
 				harmony.rtc.joinChannel(`chat:${res.secret}`);
 				// Add server to UI before the "Add Server" button
-				const serverList = document.getElementById("server-list");
-				if (serverList) {
-					const addServerBtn = serverList.querySelector('.server-item[name="HARMONY-ADD-SERVER"]');
-					const serverDiv = document.createElement("div");
-					serverDiv.className = "server-item";
-					serverDiv.setAttribute("name", res.id);
-					let name = res.name;
-					if (name.includes(" ") && name.length > 5) {
-						//split two part name into two 2 char initials
-						name = name.split(" ");
-						name = name[0].substring(0, 2) + " " + name[1].substring(0, 2);
-					} else if (name.length > 5) {
-						name = name.substring(0, 5);
-					}
-					serverDiv.textContent = DOMPurify.sanitize(name);
-					if (addServerBtn) {
-						serverList.insertBefore(serverDiv, addServerBtn);
-					} else {
-						serverList.appendChild(serverDiv);
-					}
-				}
+				uiManager.insertServerToUI(res);
+				// Show joined toast with click to switch to server
 				uiManager.showToast(`Joined ${DOMPurify.sanitize(res.name)}`, () => {
 					const serverItem = document.querySelector(`.server-item[name="${res.id}"]`);
 					if (serverItem) {
@@ -402,6 +363,12 @@ async function selectServerItem(e) {
 		FriendsManager.showFriends();
 		friendsEl.classList.remove("slide-away");
 		chatEl.classList.remove("expand");
+		if (!harmony.selectedFriend && harmony.localPrefs.friends && harmony.localPrefs.friends.length > 0) {
+			let firstFriend = document.getElementsByName(harmony.localPrefs.friends[0].id)[0];
+			if (firstFriend) {
+				FriendsManager.selectFriend(firstFriend);
+			}
+		}
 
 		let privFriend = harmony.localPrefs.friends.find((f) => f.id == harmony.selectedFriend);
 		if (privFriend && privFriend.chat) {
@@ -433,7 +400,7 @@ async function selectServerItem(e) {
 		if (voiceList) {
 			voiceList.querySelectorAll(".voice-prof").forEach((el) => el.remove());
 		}
-		socket.emit("channelQuery", `voice:${chat}`, (res) => {
+		window.socket.emit("channelQuery", `voice:${chat}`, (res) => {
 			//check if anyone is in new channels vc
 			if (res.length > 0) {
 				//add to vc ui and maybe update harmony.rtc channels?? shouldnt be needed i thinks

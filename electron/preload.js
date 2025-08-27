@@ -100,7 +100,7 @@ function defaultPrefs() {
 		servers: [],
 		settings: {
 			theme: "dark",
-			accentColor: "#e4956bff",
+			accentColor: "#e4956b",
 			language: "en-US",
 			notifications: true,
 			checkUpdate: true,

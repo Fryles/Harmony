@@ -1,9 +1,9 @@
 {
   "user": {
-    "username": "Epic Dog",
-    "userId": "735ea16a-ce96-4d80-8499-c57f9e812502",
+    "username": "Silly Billy",
+    "userId": "25603c57-83ef-48de-9576-f4e63c7fea12",
     "password": "",
-    "secret": "da9687649e3e2857040af9bd3bd03a31b4a476696ed5f40edc828cf4dea20ac8"
+    "secret": "65a475d62a07f7668e244d5d96fbffc651f94b889596cf36153f6a1c00f851c6"
   },
   "servers": [
     {
@@ -16,24 +16,101 @@
         "serverStoredMessaging": true
       },
       "admin": "f842a398-9470-4644-8165-64aad570267f",
-      "messages": []
-    },
-    {
-      "name": "sovo",
-      "id": "fc1df2bd-2730-4771-bc40-243e741047ff",
-      "secret": "eec8c3e207e0a81ca695706ee21f3b8796bb069aff44fe374f911b5816a51e94",
-      "options": {
-        "serverOpen": true,
-        "serverUnlisted": false,
-        "serverStoredMessaging": true
-      },
-      "admin": "735ea16a-ce96-4d80-8499-c57f9e812502",
-      "messages": []
+      "messages": [
+        {
+          "timestamp": 1755882333822,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "dd",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755882473515,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "hi",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755882478552,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "yo",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755884963685,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "asd",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755886306942,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "tewst",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755886311507,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "yo",
+          "type": "text",
+          "color": "#9bdbfd"
+        },
+        {
+          "timestamp": 1755886314066,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "hey",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755886758954,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "asd",
+          "type": "text",
+          "color": "#9bdbfd"
+        },
+        {
+          "timestamp": 1755886762150,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "hey",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755886795453,
+          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
+          "username": "Pog Dog",
+          "content": "das",
+          "type": "text",
+          "color": "#3bdbcd"
+        },
+        {
+          "timestamp": 1755893349563,
+          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
+          "username": "Epic Dog",
+          "content": "?",
+          "type": "text",
+          "color": "#9bdbfd"
+        }
+      ]
     }
   ],
   "settings": {
     "theme": "dark",
-    "accentColor": "#9bdbfd",
+    "accentColor": "#e4956b",
     "language": "en-US",
     "notifications": true,
     "checkUpdate": true,
@@ -41,40 +118,19 @@
   },
   "friends": [
     {
-      "name": "Chunky Hawk",
-      "id": "013eb0cb-55b6-42f7-9794-37a83e1a18a0",
-      "chat": "934b0fafbb3b1342c1c243ce02cff2755d2f73338553a46e"
-    },
-    {
       "name": "Pog Dog",
       "id": "a150e6b4-a897-4424-8cbc-be228316a143",
-      "chat": "a364b76a80539609799482ff9628660898a17b2c22194db3"
+      "chat": "4878eeeee52eb70d6bbbdf5b1201a3f82738f7f71e09aa7c"
     }
   ],
   "devices": {
     "videoInputDevices": [],
-    "audioInputDevices": [
-      {
-        "deviceId": "default",
-        "kind": "audioinput",
-        "label": "Default - Myle pods (Bluetooth)"
-      },
-      {
-        "deviceId": "76a99ee2f3660b6531a19c778271fec1ed6235beb3d06ac925286d5e2989f7a6",
-        "kind": "audioinput",
-        "label": "Myle pods (Bluetooth)"
-      }
-    ],
+    "audioInputDevices": [],
     "audioOutputDevices": [
       {
         "deviceId": "default",
         "kind": "audiooutput",
-        "label": "Default - Myle pods (Bluetooth)"
-      },
-      {
-        "deviceId": "ee0edfd3c8fa1495b4c04ed21bcbfcccf1fcbb6d73e605180be031c2d6af40d6",
-        "kind": "audiooutput",
-        "label": "Myle pods (Bluetooth)"
+        "label": "Default - Mac mini Speakers (Built-in)"
       },
       {
         "deviceId": "3825d5b1e40ce8679607ce39c6742e43370a6df6383fda3e807b36b3b7afd74e",
@@ -92,7 +148,7 @@
         "label": "Mac mini Speakers (Built-in)"
       }
     ],
-    "videoInputDevice": null,
+    "videoInputDevice": "",
     "audioInputDevice": {
       "deviceId": "default",
       "kind": "audioinput",
@@ -105,10 +161,10 @@
     }
   },
   "audio": {
-    "inputGain": 0.53,
-    "outputVolume": 0.67,
-    "hotMicThresh": 0.03,
+    "inputGain": 1,
+    "outputVolume": 0.8,
+    "hotMicThresh": 0,
     "enableNoiseSuppression": true,
-    "ringVolume": 0.22
+    "ringVolume": 0.5
   }
 }

@@ -59,11 +59,17 @@ class HarmonyUtils {
 	}
 }
 
+//TODO handle edge case if we viewing chat of removed friend
+
 // FriendsManager class for all friends-related logic
 class FriendsManager {
 	static selectFriend(e) {
 		let el = e.target || e;
 		if (el.id == "friends-header" || el.classList.contains("friends-menu-item") || el.classList.contains("no-fire")) {
+			return;
+		}
+		if (!el) {
+			console.warn("No element found for selecting friend");
 			return;
 		}
 		//stop icons from tweaking out
@@ -89,12 +95,36 @@ class FriendsManager {
 		// Add 'selected' class to the clicked friend item
 		el.classList.add("selected");
 		harmony.selectedFriend = el.getAttribute("name");
+		if (harmony.selectedFriend == null) {
+			console.warn("No friend ID found on selected element");
+			return;
+		}
 		let privFriend = harmony.localPrefs.friends.find((f) => f.id == harmony.selectedFriend);
 		if (privFriend && privFriend.chat) {
 			chatManager.displayChat(privFriend.chat);
 		} else {
 			console.log("Error finding friend chat for ", harmony.selectedFriend);
 		}
+	}
+
+	static acceptFriendReq(req) {
+		req.status = "accepted";
+		socket.emit("friendRequestResponse", req);
+		let reqDiv = document.querySelector(`.friend-request-item[reqFrom="${req.from}"]`);
+		if (reqDiv) {
+			reqDiv.remove();
+		}
+
+		harmony.friendReqs.incoming = harmony.friendReqs.incoming.filter((r) => r.id !== req.id);
+		//add friend to local prefs
+		harmony.localPrefs.friends.push({
+			name: req.fromName,
+			id: req.from,
+			chat: req.chat,
+		});
+		uiManager.showToast(`${DOMPurify.sanitize(req.fromName)} Is Now Your Friend!`, FriendsManager.showFriends);
+		window.electronAPI.updatePrefs(harmony.localPrefs);
+		harmony.rtc.joinChannel("chat:" + req.chat);
 	}
 
 	static showFriendRequests() {
@@ -138,18 +168,7 @@ class FriendsManager {
 			`;
 			reqDiv.setAttribute("reqFrom", DOMPurify.sanitize(req.from));
 			reqDiv.querySelector(".accept-friend-request").onclick = () => {
-				req.status = "accepted";
-				socket.emit("friendRequestResponse", req);
-				reqDiv.remove();
-				harmony.friendReqs.incoming = harmony.friendReqs.incoming.filter((r) => r.id !== req.id);
-				//add friend to local prefs
-				harmony.localPrefs.friends.push({
-					name: req.fromName,
-					id: req.from,
-					chat: req.chat,
-				});
-				uiManager.showToast(`${DOMPurify.sanitize(req.fromName)} Is Now Your Friend!`, FriendsManager.showFriends);
-				window.electronAPI.updatePrefs(harmony.localPrefs);
+				FriendsManager.acceptFriendReq(req);
 			};
 			reqDiv.querySelector(".reject-friend-request").onclick = () => {
 				req.status = "rejected";
@@ -275,6 +294,8 @@ class FriendsManager {
 					id: request.to,
 					chat: request.chat,
 				});
+				//connect to chat
+				harmony.rtc.joinChannel("chat:" + request.chat);
 				window.electronAPI.updatePrefs(harmony.localPrefs);
 				uiManager.showToast(`${DOMPurify.sanitize(request.toName)} Is Now Your Friend!`);
 			} else {
@@ -886,6 +907,34 @@ class uiManager {
 			}
 			closeToast();
 		}, timeout);
+	}
+
+	static insertServerToUI(server) {
+		const serverList = document.getElementById("server-list");
+		if (!serverList) return;
+
+		const addServerBtn = serverList.querySelector('.server-item[name="HARMONY-ADD-SERVER"]');
+		const serverDiv = document.createElement("div");
+
+		serverDiv.className = "server-item";
+		serverDiv.setAttribute("name", server.id);
+
+		let displayName = server.name;
+		if (displayName.includes(" ") && displayName.length > 5) {
+			const parts = displayName.split(" ");
+			displayName = parts[0].substring(0, 2) + " " + parts[1].substring(0, 2);
+		} else if (displayName.length > 5) {
+			displayName = displayName.substring(0, 5);
+		}
+
+		serverDiv.textContent = DOMPurify.sanitize(displayName);
+		serverDiv.addEventListener("click", selectServerItem, true);
+
+		if (addServerBtn) {
+			serverList.insertBefore(serverDiv, addServerBtn);
+		} else {
+			serverList.appendChild(serverDiv);
+		}
 	}
 
 	static manageVoiceUser(e) {

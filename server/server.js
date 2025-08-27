@@ -39,7 +39,7 @@ const db = await JSONFilePreset("db.json", {
 });
 
 //throttles/security
-const pepper = Math.round(Math.random() * 420);
+const pepper = process.env.PEPPER || Math.round(Math.random() * 420);
 console.log("pepper: ", pepper);
 const addServerThrottle = {};
 const addUserThrottle = {};
@@ -729,7 +729,6 @@ function generateUuidBySeed(seedString) {
 	//add per server session salt to hash to stop guessing of fake uuids
 	seedString = `${seedString}${pepper}`;
 	//Enumerating unlisted servers is still possible between server restarts
-	//TODO make pepper a ENV maybe??
 	const hash = crypto.createHash("sha256").update(seedString).digest("hex");
 
 	// UUID version 4 consists of 32 hexadecimal digits in the form:
