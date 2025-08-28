@@ -60,6 +60,9 @@ class HarmonyUtils {
 }
 
 //TODO handle edge case if we viewing chat of removed friend
+//TODO stored server messages not loading on first join
+//TODO verify a newly added friend is selected when opening friends list
+//TODO verify voice user addittion to ui is working. cause its not with 3 peers
 
 // FriendsManager class for all friends-related logic
 class FriendsManager {
@@ -909,6 +912,92 @@ class uiManager {
 		}, timeout);
 	}
 
+	static async selectServerItem(e) {
+		//stop icons from tweaking out
+		if (e.target.tagName.toLowerCase() != "div") {
+			if (e.target.parentElement) {
+				e.target.parentElement.dispatchEvent(new Event("click", { bubbles: true }));
+			}
+			return;
+		}
+		if (harmony.selectedServer == e.target.getAttribute("name")) {
+			//same server we already selected...
+			uiManager.showToast("Already viewing this server");
+			return;
+		}
+		if (e.target.getAttribute("name") == "HARMONY-ADD-SERVER") {
+			//open add server modal
+			uiManager.openModal("add-server-modal");
+			return;
+		}
+
+		harmony.selectedServer = e.target.getAttribute("name");
+		// Remove 'selected' class from all server items except the clicked one
+		document.querySelectorAll(".server-item.selected").forEach((item) => {
+			if (item !== e.target) {
+				item.classList.remove("selected");
+			}
+		});
+		// Add 'selected' class to the clicked server item
+		e.target.classList.add("selected");
+
+		const friendsEl = document.getElementById("friends");
+		// Handle chat display
+		const chatEl = document.getElementById("chat");
+		var chat;
+		if (harmony.selectedServer == "HARMONY-FRIENDS-LIST") {
+			FriendsManager.showFriends();
+			friendsEl.classList.remove("slide-away");
+			chatEl.classList.remove("expand");
+			if (!harmony.selectedFriend && harmony.localPrefs.friends && harmony.localPrefs.friends.length > 0) {
+				let firstFriend = document.getElementsByName(harmony.localPrefs.friends[0].id)[0];
+				if (firstFriend) {
+					FriendsManager.selectFriend(firstFriend);
+				}
+			}
+
+			let privFriend = harmony.localPrefs.friends.find((f) => f.id == harmony.selectedFriend);
+			if (privFriend && privFriend.chat) {
+				chat = privFriend.chat;
+				chatManager.displayChat(chat);
+			} else {
+				//no friend chat to display, show empty chat
+				chatManager.displayChat(null);
+				console.log("Error finding friend chat for ", harmony.selectedFriend);
+			}
+		} else {
+			friendsEl.classList.add("slide-away");
+			chatEl.classList.add("expand");
+
+			let privServer = harmony.localPrefs.servers.find((f) => f.id == harmony.selectedServer);
+			if (privServer && privServer.secret !== null && privServer.secret !== undefined) {
+				chat = privServer.secret;
+				chatManager.displayChat(chat);
+			} else {
+				//no server chat to display, show empty chat
+				chatManager.displayChat(null);
+				console.log("Error finding server chat for ", harmony.selectedServer);
+			}
+		}
+		//if we are not in a mediaChannel and not getting a ring, clear voice and update to new server when switching
+		if (!harmony.rtc.mediaChannel && !harmony.rtc.ring) {
+			// Clear all .voice-prof elements in #voice-list
+			const voiceList = document.getElementById("voice-list");
+			if (voiceList) {
+				voiceList.querySelectorAll(".voice-prof").forEach((el) => el.remove());
+			}
+			window.socket.emit("channelQuery", `voice:${chat}`, (res) => {
+				//check if anyone is in new channels vc
+				if (res.length > 0) {
+					//add to vc ui and maybe update harmony.rtc channels?? shouldnt be needed i thinks
+					res.forEach((user) => {
+						harmony.rtc.addVoiceUser(user);
+					});
+				}
+			});
+		}
+	}
+
 	static insertServerToUI(server) {
 		const serverList = document.getElementById("server-list");
 		if (!serverList) return;
@@ -928,7 +1017,7 @@ class uiManager {
 		}
 
 		serverDiv.textContent = DOMPurify.sanitize(displayName);
-		serverDiv.addEventListener("click", selectServerItem, true);
+		serverDiv.addEventListener("click", this.selectServerItem, true);
 
 		if (addServerBtn) {
 			serverList.insertBefore(serverDiv, addServerBtn);

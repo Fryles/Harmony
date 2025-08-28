@@ -43,7 +43,9 @@ function createWindow() {
 	// and load the index.html of the app.
 	mainWindow.loadFile("index.html");
 	// Open the DevTools.
-	// mainWindow.webContents.openDevTools();
+	if (!app.isPackaged) {
+		mainWindow.webContents.openDevTools();
+	}
 }
 
 // This method will be called when Electron has finished
@@ -54,7 +56,9 @@ app.whenReady().then(() => {
 	ipcMain.handle("get-prefs", getPrefs);
 
 	createWindow();
-	//createWindow();
+	if (!app.isPackaged) {
+		createWindow();
+	}
 
 	app.on("activate", function () {
 		// On macOS it's common to re-create a window in the app when the

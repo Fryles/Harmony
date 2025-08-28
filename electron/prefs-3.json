@@ -1,9 +1,9 @@
 {
   "user": {
-    "username": "Silly Billy",
-    "userId": "25603c57-83ef-48de-9576-f4e63c7fea12",
+    "username": "Radical Cow",
+    "userId": "3b48d391-193d-4ffe-bd6f-1a7851da527f",
     "password": "",
-    "secret": "65a475d62a07f7668e244d5d96fbffc651f94b889596cf36153f6a1c00f851c6"
+    "secret": "4adbec2a574ece1fa9a6eaf749ebd116f24dfd34c7ff64ff5711153c1b115abd"
   },
   "servers": [
     {
@@ -96,14 +96,6 @@
           "content": "das",
           "type": "text",
           "color": "#3bdbcd"
-        },
-        {
-          "timestamp": 1755893349563,
-          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
-          "username": "Epic Dog",
-          "content": "?",
-          "type": "text",
-          "color": "#9bdbfd"
         }
       ]
     }
@@ -120,7 +112,7 @@
     {
       "name": "Pog Dog",
       "id": "a150e6b4-a897-4424-8cbc-be228316a143",
-      "chat": "8027323ea08ca048a4d1620f794e9dae5a856cf3f33a6184"
+      "chat": "a6d214bb7d8100863b520ab77500697b67c438b199da2b77"
     }
   ],
   "devices": {
@@ -179,7 +171,7 @@
   "audio": {
     "inputGain": 1,
     "outputVolume": 0.8,
-    "hotMicThresh": 0,
+    "hotMicThresh": 0.1,
     "enableNoiseSuppression": true,
     "ringVolume": 0.5
   }

@@ -239,9 +239,7 @@ class rtcInterface {
 
 	VoiceHangup() {
 		this.stopLocalVoice();
-		if (this.mediaChannel) {
-			this.leaveChannel(this.mediaChannel);
-		} else {
+		if (!this.mediaChannel) {
 			console.warn("attempted to hang up vc with no set mediaChannel");
 			return;
 		}
@@ -268,6 +266,9 @@ class rtcInterface {
 					//for each peer in res, add to vc ui
 				}
 			});
+		}
+		if (this.mediaChannel) {
+			this.leaveChannel(this.mediaChannel);
 		}
 	}
 
