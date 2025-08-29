@@ -17,7 +17,6 @@ export const harmony = {
 //for dev rn
 window.harmony = harmony;
 const dev = harmony.dev;
-let lastLoopingToast = 0;
 
 init();
 
@@ -52,7 +51,7 @@ async function init() {
 	}
 	harmony.selfId = harmony.localPrefs.user.userId;
 
-	await webSocketInit();
+	webSocketInit();
 	harmony.rtc = new rtcInterface();
 	if (!harmony.localPrefs.user.secret) {
 		//bro what
@@ -196,7 +195,7 @@ async function init() {
 	FriendsManager.checkFriendReqs();
 }
 
-async function webSocketInit() {
+function webSocketInit() {
 	//get session
 	const session = localStorage.getItem("session");
 	const auth = {
@@ -218,13 +217,21 @@ async function webSocketInit() {
 	window.socket.on("connect_error", (err) => {
 		if (err.message == "xhr poll error") {
 			const now = Date.now();
-			if (now - lastLoopingToast > 7000) {
+			if (now - uiManager.lastLoopingToast > 5000) {
 				uiManager.showToast("Disconnected from server");
-				lastLoopingToast = now;
+				uiManager.lastLoopingToast = now;
 			}
 			return;
+		} else if (err.message == "timeout") {
+			const now = Date.now();
+			if (now - uiManager.lastLoopingToast > 5000) {
+				uiManager.showToast("Timeout when connecting to server");
+				uiManager.lastLoopingToast = now;
+			}
+			return;
+		} else {
+			uiManager.showToast(err.message);
 		}
-		uiManager.showToast(err.message);
 	});
 	window.socket.emit("ready");
 }
@@ -324,7 +331,6 @@ function addServer() {
 		});
 	});
 }
-
 
 // Validates then saves preferences to local and server for user/pass
 async function storePrefs() {

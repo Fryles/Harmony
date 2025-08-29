@@ -350,8 +350,6 @@ class FriendsManager {
 			if (request.from != harmony.selfId && request.to == harmony.selfId) {
 				// Remove from local friends and ack removal
 				this.removeFriend(request.from);
-				// Remove from incoming requests
-				harmony.friendReqs.incoming = harmony.friendReqs.incoming.filter((r) => r.from != request.from);
 			}
 		});
 
@@ -401,6 +399,8 @@ class FriendsManager {
 
 	//removes friend from local and emits to server to either ack or send removal
 	static removeFriend(userId, callback = null) {
+		// Remove from incoming requests
+		harmony.friendReqs.incoming = harmony.friendReqs.incoming.filter((r) => r.from != userId);
 		if (!userId || userId === harmony.selfId) {
 			console.warn("Failed to remove friend: Invalid user ID to remove.");
 			return;
@@ -492,6 +492,7 @@ class chatManager {
 				if (serverResponse.success) {
 					console.log("Message stored on server:", serverResponse);
 				} else {
+					showToast("Failed to store message on server (sleepy sovo?)");
 					console.error("Failed to store message on server:", serverResponse.error);
 				}
 			});
