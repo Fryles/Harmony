@@ -118,8 +118,13 @@ async function init() {
 	const initServerList = () => {
 		const updateServerItems = () => {
 			document.querySelectorAll(".server-item").forEach((div) => {
+				// left click
 				div.removeEventListener("click", uiManager.selectServerItem, true);
 				div.addEventListener("click", uiManager.selectServerItem, true);
+				// right click (contextmenu)
+				div.removeEventListener("contextmenu", uiManager.manageServerItem, true);
+				div.addEventListener("contextmenu", uiManager.manageServerItem, true);
+				// select selected server...
 				div.classList.toggle("selected", div.getAttribute("name") === harmony.selectedServer);
 			});
 		};
@@ -196,7 +201,7 @@ async function init() {
 
 	const initSettingsAndModals = () => {
 		chatManager.chatInit();
-		uiManager.attachModalHandlers();
+		uiManager.attachGlobalHandlers();
 
 		document.getElementById("settings-save").addEventListener("click", async () => {
 			if (await storePrefs()) {
@@ -297,6 +302,7 @@ async function webSocketInit() {
 		const data = await response.json();
 		console.log("Logged in, session:", data);
 		localStorage.setItem("session", data.session);
+		localStorage.setItem("sessionExpiresOn", data.sessionExpiresOn);
 	}
 	const auth = {
 		userId: harmony.selfId,
@@ -374,10 +380,7 @@ async function registerServer() {
 			console.log(res);
 
 			// Add server to prefs and update
-			if (!harmony.localPrefs.servers) harmony.localPrefs.servers = [];
-			harmony.localPrefs.servers.push(res.server);
-			// Add server to UI before the "Add Server" button
-			uiManager.insertServerToUI(res.server);
+
 			uiManager.closeModals();
 			//clear add server modal inputs
 			document.getElementById("serverNameInput").value = "";
@@ -397,15 +400,13 @@ async function registerServer() {
 	});
 }
 
-//called in add server modal to attempt to find id from server name, then authenticate with the server and add to ui
-function addServer(name,pwd) {
-
-
+//called in join/add server modal to attempt to find id from server name, then authenticate with the server and add to ui
+function addServer(name, pwd) {
 	if (!name || name.trim() === "") {
 		name = document.getElementById("joinServerNameInput").value;
 		if (!name || name.trim() === "") {
-		uiManager.showToast("Server name cannot be empty.");
-		return;
+			uiManager.showToast("Server name cannot be empty.");
+			return;
 		}
 	}
 
@@ -420,6 +421,12 @@ function addServer(name,pwd) {
 			if (res) {
 				// good auth, add server to prefs and connect
 				if (!harmony.localPrefs.servers) harmony.localPrefs.servers = [];
+				//if we already have this server, delete before re-adding
+
+				let existing = harmony.localPrefs.servers.find((f) => f.id == res.id);
+				if (existing) {
+					harmony.localPrefs.servers = harmony.localPrefs.servers.filter((s) => s.id !== res.id);
+				}
 				harmony.localPrefs.servers.push(res);
 				harmony.rtc.joinChannel(`chat:${res.secret}`);
 				// Add server to UI before the "Add Server" button
@@ -552,8 +559,6 @@ async function storePrefs(registering = false) {
 			if (!response.ok) {
 				const err = await response.json();
 				throw new Error(err.error || "Registration failed");
-				uiManager.showToast(err.error || "Registration failed");
-				return false;
 			} else {
 				harmony.localPrefs.user.username = usernameEl.value;
 				harmony.localPrefs.user.secret = newSecret;
@@ -562,6 +567,7 @@ async function storePrefs(registering = false) {
 				const data = await response.json();
 				console.log("Registered:", data);
 				localStorage.setItem("session", data.session);
+				localStorage.setItem("sessionExpiresOn", data.sessionExpiresOn);
 				uiManager.closeModals();
 				return true;
 			}

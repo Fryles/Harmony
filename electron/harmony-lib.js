@@ -790,7 +790,7 @@ class uiManager {
 		$target.classList.add("is-active");
 	}
 
-	static attachModalHandlers() {
+	static attachGlobalHandlers() {
 		//opens
 		var $modalButtons = this.getAll(".modal-button");
 		if ($modalButtons.length > 0) {
@@ -820,6 +820,33 @@ class uiManager {
 				});
 			});
 		}
+
+		//close class="popup" on left/right click not on a popup or popup child
+		document.addEventListener("mousedown", (evt) => {
+			this.closePopUps(evt);
+		});
+	}
+
+	static closePopUps(evt) {
+		// TODO add optional params to close only certain pop ups?? idk if needed
+		const popups = document.querySelectorAll("#manage-server-popup, #voice-user-popup, #chat-user-popup");
+
+		popups.forEach((popup) => {
+			const clickedInside = evt?.target && popup.contains(evt.target);
+
+			if (!clickedInside) {
+				popup.classList.add("fade-out");
+
+				// Wait for transition to complete before removing
+				popup.addEventListener(
+					"transitionend",
+					() => {
+						popup.remove();
+					},
+					{ once: true },
+				);
+			}
+		});
 	}
 
 	static closeModals() {
@@ -876,8 +903,7 @@ class uiManager {
 		toast.innerHTML = `
 		${DOMPurify.sanitize(msg)}<button class="toastClose ml-2 mr-1"><span class="icon is-small">
       <i class="fas fa-xmark"></i>
-    </span></button>
-	`;
+    </span></button>`;
 		toast.querySelector(".toastClose").onclick = () => {
 			closeToast();
 		};
@@ -1006,6 +1032,154 @@ class uiManager {
 		}
 	}
 
+	static manageServerItem(e) {
+		const serverId = e.target.getAttribute("name");
+		if (!serverId) {
+			console.log("No server selected for management.");
+			return;
+		}
+
+		const serverEl = e.target;
+
+		// Find the server in local preferences
+		const server = harmony.localPrefs.servers.find((s) => s.id === serverId);
+		if (!server) {
+			console.log("Server not found in local preferences:", serverId);
+			return;
+		}
+		const adminUsername = userUtils.userLookup(server.admin);
+
+		//attach pop up
+		const popup = document.createElement("div");
+		popup.id = "manage-server-popup";
+		popup.style.position = "absolute";
+		popup.style.zIndex = 10000;
+		popup.style.background = "#23272a";
+		popup.style.border = "1px solid #444";
+		popup.style.borderRadius = "10px";
+		popup.style.padding = "1rem";
+		popup.style.boxShadow = "0 2px 10px rgba(0,0,0,0.4)";
+		popup.style.width = "250px";
+		popup.style.color = "#fff";
+		popup.innerHTML = `
+			<div style="margin-bottom: 0.5rem; font-weight: bold;">${server.name}</div>
+			<div style="font-size:0.9em;margin-bottom:0.5rem;">
+				<span class="is-clickable" style="color: var(--bulma-grey-light)" onclick="navigator.clipboard.writeText('${server.id}');showToast('Copied User ID');">${server.id}</span>
+			</div>
+			<div style="font-size:0.9em;margin-bottom:0.5rem;">
+			Options:<br>
+<form>
+  <input type="checkbox"
+         value="${server.options.serverOpen}"
+         ${server.options.serverOpen ? "checked" : ""}
+         disabled>
+  <label>Server Open</label>
+
+  <input type="checkbox"
+         value="${server.options.serverUnlisted}"
+         ${server.options.serverUnlisted ? "checked" : ""}
+         disabled>
+  <label>Server Unlisted</label>
+
+  <input type="checkbox"
+         value="${server.options.serverStoredMessaging}"
+         ${server.options.serverStoredMessaging ? "checked" : ""}
+         disabled>
+  <label>Server Stored Messaging</label>
+</form>
+			</div>
+<div>
+<button class="button is-small is-link" id="edit-server-button" style="width:40%;margin-bottom:0.3rem;">
+						<i class="fas fa-user-plus"></i> Edit Server
+					</button>
+					${
+						server.admin === harmony.selfId ?
+							`<button class="button is-small is-danger" id="delete-server-button" style="width:40%;margin-bottom:0.3rem;">
+						<i class="fas fa-user-plus"></i> Delete Server
+							</button>`
+						:	`<button class="button is-small is-danger" id="leave-server-button" style="width:40%;margin-bottom:0.3rem;">
+						<i class="fas fa-user-plus"></i> Leave Server
+					</button>`
+					}
+
+</div>
+
+				<div style="font-size:0.9em;margin-bottom:0.5rem;">
+				<span>Admin: ${adminUsername}</span>
+				<span class="is-clickable" style="color: var(--bulma-grey-light)" onclick="navigator.clipboard.writeText('${server.admin}');showToast('Copied Server Admin ID');">(${server.admin})</span>
+			</div>
+		`;
+
+		let rect = serverEl.getBoundingClientRect();
+		popup.style.top = `${rect.top + window.scrollY}px`;
+		popup.style.left = `${rect.left + window.scrollX + 70}px`;
+
+		// button handlers:
+		popup.querySelector("#edit-server-button")?.addEventListener("click", () => {
+			//close pop up when opening edit modal
+			uiManager.closePopUps();
+			uiManager.openModal("edit-server-modal", { serverId });
+		});
+
+		popup.querySelector("#delete-server-button")?.addEventListener("click", () => {
+			// confirm and delete logic, make user type server name to confirm deletion
+		});
+
+		popup.querySelector("#leave-server-button")?.addEventListener("click", () => {
+			// confirm and leave logic, show modal to confirm
+			let confirmModal = ``;
+		});
+
+		document.body.appendChild(popup);
+	}
+
+	static manageServerAction(e) {
+		// Determine action based on clicked button or context
+		const action = e.target.getAttribute("data-action");
+		switch (action) {
+			case "edit":
+				// Open modal to edit server details
+				uiManager.openModal("edit-server-modal", { serverId });
+				break;
+			case "delete":
+				// only show if admin
+				if (confirm(`Are you sure you want to delete server "${server.name}"?`)) {
+					// Remove from localPrefs
+					harmony.localPrefs.servers = harmony.localPrefs.servers.filter((s) => s.id !== serverId);
+					// Remove server element from UI
+					const el = document.getElementsByName(serverId)[0];
+					if (el) el.remove();
+					// Notify backend
+					window.socket.emit("deleteServer", serverId);
+					// Reset selected server if it was the one deleted
+					if (harmony.selectedServer === serverId) {
+						harmony.selectedServer = null;
+						chatManager.displayChat(null);
+					}
+					uiManager.showToast(`Server "${server.name}" deleted.`);
+				}
+				break;
+			case "leave":
+				if (confirm(`Are you sure you want to leave server "${server.name}"?`)) {
+					// Notify backend to leave
+					window.socket.emit("leaveServer", serverId);
+					// Remove from localPrefs
+					harmony.localPrefs.servers = harmony.localPrefs.servers.filter((s) => s.id !== serverId);
+					const el = document.getElementsByName(serverId)[0];
+					if (el) el.remove();
+					// Reset selected server if necessary
+					if (harmony.selectedServer === serverId) {
+						harmony.selectedServer = null;
+						chatManager.displayChat(null);
+					}
+					uiManager.showToast(`Left server "${server.name}".`);
+				}
+				break;
+			default:
+				console.log("Unknown server management action:", action);
+		}
+	}
+
 	static insertServerToUI(server) {
 		const serverList = document.getElementById("server-list");
 		if (!serverList) return;
@@ -1046,8 +1220,6 @@ class uiManager {
 		if (!userDiv) return;
 
 		// Remove any existing popup
-		const existingPopup = document.getElementById("voice-user-popup");
-		if (existingPopup) existingPopup.remove();
 
 		const userId = userDiv.id;
 		let friend = userUtils.userLookup(userId);
@@ -1116,35 +1288,6 @@ class uiManager {
 			FriendsManager.sendFriendReq(userId);
 			popup.remove();
 		};
-
-		// Close popup on outside click
-		const closePopup = (evt) => {
-			if (!popup.contains(evt.target)) {
-				popup.remove();
-				document.removeEventListener("mousedown", closePopup, true);
-				//save volume to prefs
-				const vol = parseFloat(slider.value);
-				let friend = harmony.localPrefs.friends.find((f) => f.id == userId);
-				if (friend && friend.volume != vol) {
-					friend.volume = vol;
-					//avoid writing to json if no change
-					window.electronAPI.updatePrefs(harmony.localPrefs);
-				} else {
-					// Store in voiceUserVolumes in localStorage
-					let voiceUserVolumes = {};
-					try {
-						voiceUserVolumes = JSON.parse(localStorage.getItem("voiceUserVolumes")) || {};
-					} catch (e) {
-						voiceUserVolumes = {};
-					}
-					voiceUserVolumes[userId] = vol;
-					localStorage.setItem("voiceUserVolumes", JSON.stringify(voiceUserVolumes));
-				}
-			}
-		};
-		setTimeout(() => {
-			document.addEventListener("mousedown", closePopup, true);
-		}, 10);
 	}
 
 	static manageChatUser(msgEl) {
@@ -1159,10 +1302,6 @@ class uiManager {
 			uiManager.showToast("User info not available for this message.");
 			return;
 		}
-
-		// Remove any existing popup
-		const existingPopup = document.getElementById("chat-user-popup");
-		if (existingPopup) existingPopup.remove();
 
 		let friend = userUtils.userLookup(userId);
 		let username = DOMPurify.sanitize(
@@ -1236,17 +1375,6 @@ class uiManager {
 				popup.remove();
 			};
 		}
-
-		// Close popup on outside click
-		const closePopup = (evt) => {
-			if (!popup.contains(evt.target)) {
-				popup.remove();
-				document.removeEventListener("mousedown", closePopup, true);
-			}
-		};
-		setTimeout(() => {
-			document.addEventListener("mousedown", closePopup, true);
-		}, 10);
 	}
 }
 

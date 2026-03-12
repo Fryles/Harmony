@@ -130,8 +130,9 @@ app.post("/register", async (req, res) => {
 	}
 	// registerUser will validate and sanitize before creating user and session
 	const result = await registerUser(userId, userName, secret);
+	const sessionTimestamp = Date.now();
 	if (result.success) {
-		res.json({ session: result.session });
+		res.json({ session: result.session, sessionExpiresOn: sessionTimestamp + sessionExpiry });
 		// add ip to db for throttling
 		addUserThrottle[req.ip] = Date.now();
 		console.log("added ", req.ip, " to user throttle");
@@ -841,7 +842,6 @@ async function registerUser(userId, name, secret) {
 	return {
 		success: true,
 		session: sessionToken,
-		sessionExpiresOn: sessionTimestamp + sessionExpiry,
 	};
 }
 

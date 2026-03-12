@@ -503,6 +503,51 @@
 				</footer>
 			</div>
 		</div>
+
+		<!-- Edit server modal -->
+		<div class="modal" id="edit-server-modal">
+			<div class="modal-background"></div>
+			<div class="modal-card">
+				<header
+					class="modal-card-head pb-0 pt-6"
+					style="flex-direction: column; align-items: stretch; background-color: #00000000"></header>
+				<section class="modal-card-body">
+					<div id="edit-server-content">
+						<div class="field">
+							<label class="label">Server Name</label>
+							<div class="control">
+								<input
+									class="input"
+									type="text"
+									id="editServerNameInput"
+									placeholder="Enter server name (caps matter)" />
+							</div>
+						</div>
+						<div class="field">
+							<label class="checkbox">
+								<input type="checkbox" id="editServerUnlisted" />
+								Unlisted
+							</label>
+							<span class="tag is-primary"
+								>Your server will not be publicly searchable. This does not stop any joining.</span
+							>
+						</div>
+						<div class="field">
+							<label class="checkbox">
+								<input type="checkbox" id="editServerStoredMessaging" />
+								Stored Messaging </label
+							><span class="tag is-primary">Saves sent messages on server for consistent message history.</span>
+						</div>
+					</div>
+				</section>
+				<footer class="modal-card-foot">
+					<div class="buttons">
+						<button class="button is-primary" id="editServerSave">Save Edits</button>
+						<button class="button close">Cancel</button>
+					</div>
+				</footer>
+			</div>
+		</div>
 		<!-- You can also require other files to run in this process -->
 		<script type="module" src="./harmony.js"></script>
 		<script type="module" src="./harmony-lib.js"></script>

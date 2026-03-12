@@ -312,7 +312,10 @@ code {
 #friends {
 	height: 100vh;
 	border-right: var(--bulma-black-ter) 4px solid;
-	transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+	transition:
+		transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+		width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+		opacity 0.3s;
 	will-change: transform, width, opacity;
 	width: calc-size(auto, size);
 	opacity: 1;
@@ -550,4 +553,12 @@ label.checkbox {
 	border-radius: 10px;
 }
 .chatLine {
+}
+
+.fade-out {
+	opacity: 0;
+	transform: scale(0.1);
+	transition:
+		opacity 0.2s ease,
+		transform 0.2s ease;
 }
