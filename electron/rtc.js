@@ -2,7 +2,7 @@ import { harmony } from "./harmony.js";
 import { userUtils, uiManager, HarmonyUtils } from "./harmony-lib.js";
 import { visualizeBorderWithAudio, getAudioAmplitude } from "./audiovis.js";
 class rtcInterface {
-	constructor() {
+	constructor(iceServers = [{ urls: "stun:stun.l.google.com:19302" }]) {
 		//This is only changed for new connections
 		this.mediaChannel = null; //channel for video/voice
 		this.peerConnections = {};
@@ -11,7 +11,7 @@ class rtcInterface {
 		this.remoteAudioGainNodes = {};
 		this.dataChannels = {};
 		this.rtcConfig = {
-			iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+			iceServers: iceServers,
 		};
 		this.localAudioStream = null;
 		this.unProcessedLocalAudio = null;
@@ -77,27 +77,52 @@ class rtcInterface {
 			if (!this.peerChannels[newPeer].includes(data.channel)) {
 				this.peerChannels[newPeer].push(data.channel);
 			}
-			//if peer is joining on a voice channel we are on, add to voice ui
+			// if peer is joining on a voice channel we are on, add to voice UI
 			const [type] = data.channel ? data.channel.split(":") : [null];
-			if (type === "voice" && this.mediaChannel == data.channel) {
+			if (type === "voice" && this.mediaChannel === data.channel) {
 				const pc = this.peerConnections[newPeer];
+				if (!pc) {
+					console.warn(`No peer connection found for ${newPeer}`);
+					return;
+				}
+
 				if (this.ring) {
-					//joining during ring... stop ring
+					// joining during ring... stop ring
 					this.voiceRingEnd();
 				}
-				// Add local audio tracks to the existing connection (if not already present)
+
+				// Attach local audio track to the pre-created audio transceiver
 				if (this.localAudioStream) {
-					const senders = pc.getSenders();
-					this.localAudioStream.getTracks().forEach((track) => {
-						const alreadyAdded = senders.some((sender) => sender.track && sender.track.id === track.id);
-						if (!alreadyAdded) {
-							pc.addTrack(track, this.localAudioStream);
-							console.log("Added local track to peer connection");
-						}
-					});
+					const audioTrack = this.localAudioStream.getAudioTracks()[0];
+					const transceiver = pc._audioTransceiver;
+
+					if (transceiver && audioTrack) {
+						transceiver.sender.replaceTrack(audioTrack);
+						transceiver.direction = "sendrecv";
+
+						console.log("Attached local audio track to transceiver");
+					} else {
+						console.warn("Audio transceiver missing or no audio track", pc);
+					}
 				} else {
-					console.warn("No local audio when peer joined our vc");
+					console.warn("No local audio when peer joined our VC");
+				} // Attach local audio track to the pre-created audio transceiver
+				if (this.localAudioStream) {
+					const audioTrack = this.localAudioStream.getAudioTracks()[0];
+					const transceiver = pc._audioTransceiver;
+
+					if (transceiver && audioTrack) {
+						transceiver.sender.replaceTrack(audioTrack);
+						transceiver.direction = "sendrecv";
+
+						console.log("Attached local audio track to transceiver");
+					} else {
+						console.warn("Audio transceiver missing or no audio track", pc);
+					}
+				} else {
+					console.warn("No local audio when peer joined our VC");
 				}
+
 				this.addVoiceUser(newPeer);
 			}
 		});
@@ -158,8 +183,6 @@ class rtcInterface {
 
 		// Join all server and friend chats on startup
 		if (harmony.localPrefs) {
-			console.log(harmony.localPrefs);
-
 			// Join all server chats
 			if (Array.isArray(harmony.localPrefs.servers)) {
 				harmony.localPrefs.servers.forEach((server) => {
@@ -216,9 +239,8 @@ class rtcInterface {
 		e.classList.toggle("has-text-primary");
 		e.classList.toggle("has-text-danger");
 		if (harmony.rtc.localAudioStream) {
-			harmony.rtc._inputGainNode.gain.value = e.classList.contains("fa-microphone-slash")
-				? 0
-				: harmony.rtc.inputGainValue;
+			harmony.rtc._inputGainNode.gain.value =
+				e.classList.contains("fa-microphone-slash") ? 0 : harmony.rtc.inputGainValue;
 		}
 	}
 
@@ -504,29 +526,39 @@ class rtcInterface {
 	}
 
 	leaveChannel(channel) {
-		// technically we can leave any channel but this is only called on voice leave rn
 		const [type] = channel ? channel.split(":") : [null];
-		if (type == "voice" && this.mediaChannel == channel) {
+
+		if (type === "voice" && this.mediaChannel === channel) {
+			// --- disable audio on all peer connections ---
+			Object.keys(this.peerConnections).forEach((peerId) => {
+				const pc = this.peerConnections[peerId];
+				if (!pc || !pc._audioTransceiver) return;
+
+				const transceiver = pc._audioTransceiver;
+
+				// remove our outgoing audio
+				transceiver.sender.replaceTrack(null);
+
+				// stop receiving audio as well
+				transceiver.direction = "inactive";
+			});
+
+			// --- stop local mic capture ---
 			if (this.localAudioStream) {
-				//stop local audio
-				this.localAudioStream.getTracks().forEach((track) => {
-					track.stop();
-				});
+				this.localAudioStream.getTracks().forEach((track) => track.stop());
 				this.localAudioStream = null;
 			}
-			if (this.remoteAudioStreams) {
-				//remove all remoteaudio streams
-				Object.keys(this.peerConnections).forEach((peerId) => {
-					if (this.remoteAudioStreams[peerId]) {
-						this.remoteAudioStreams[peerId].getTracks().forEach((track) => {
-							track.stop();
-						});
-						this.remoteAudioStreams[peerId] = null;
-						delete this.remoteAudioStreams[peerId];
-					}
-				});
-				this.remoteAudioStreams = {};
-			}
+
+			// --- stop playing remote audio (UI side only) ---
+			Object.keys(this.remoteAudioStreams).forEach((peerId) => {
+				const stream = this.remoteAudioStreams[peerId];
+
+				if (stream) {
+					stream.getTracks().forEach((track) => track.stop());
+				}
+
+				delete this.remoteAudioStreams[peerId];
+			});
 
 			const msg = {
 				timestamp: Date.now(),
@@ -538,103 +570,50 @@ class rtcInterface {
 
 			removeVoiceUser(harmony.selfId);
 			setVoiceUIState("idle");
+
 			console.log(`Sending voiceLeave on ${this.mediaChannel}`);
+
 			this.sendMessage(msg, setChannelType(this.mediaChannel, "chat"));
+
 			this.mediaChannel = null;
 		}
 
 		this.socket.emit("leaveChannel", channel);
-		console.log("broadcasted leaveChannel on ", channel);
-	}
 
-	startVoiceConnection(peerId, channel) {
-		const pc = this.peerConnections[peerId];
-		if (!pc) {
-			console.error("No existing peer connection to start voice from...");
-			return;
-		}
-		this.peerChannels[peerId] = this.peerChannels[peerId] || [];
-		if (!this.peerChannels[peerId].includes(channel)) {
-			this.peerChannels[peerId].push(channel);
-		}
-		// If we already have a remote audio stream for this peer, don't add again
-		if (this.remoteAudioStreams[peerId]) {
-			console.log("Voice - Attempted to connect to existing peer");
-			return;
-		}
-		// Add local audio tracks to the existing connection (if not already present)
-		if (this.localAudioStream) {
-			const senders = pc.getSenders();
-			this.localAudioStream.getTracks().forEach((track) => {
-				const alreadyAdded = senders.some((sender) => sender.track && sender.track.id === track.id);
-				if (!alreadyAdded) {
-					pc.addTrack(track, this.localAudioStream);
-					console.log("Added local track to peer connection");
-				}
-			});
-		} else {
-			console.warn("No local audio when joining voice connection");
-		}
-
-		pc.ontrack = (event) => {
-			console.log("recieved remote track", event);
-			this.remoteAudioStreams[peerId] = event.streams[0];
-			this._playRemoteAudio(peerId, event);
-		};
-
-		pc.onnegotiationneeded = async () => {
-			try {
-				const offer = await pc.createOffer({ offerToReceiveAudio: true });
-				await pc.setLocalDescription(offer);
-				this.sendSignalingMessage(channel, peerId, {
-					type: "offer",
-					offer: pc.localDescription,
-				});
-			} catch (err) {
-				console.error("Negotiation error:", err);
-			}
-		};
+		console.log("broadcasted leaveChannel on", channel);
 	}
 
 	startChatConnection(peerId, channel) {
-		if (this.dataChannels[peerId]) {
-			//already have dataChannel connection... return
-			console.log("Chat - Attempted to connect to existing peer");
-			return;
+		let pc = this.peerConnections[peerId];
+
+		if (!pc) {
+			pc = this._createPeerConnection(peerId, channel);
+			this.peerConnections[peerId] = pc;
 		}
 
-		const pc = this.peerConnections[peerId] ? this.peerConnections[peerId] : new RTCPeerConnection(this.rtcConfig);
 		this.peerChannels[peerId] = this.peerChannels[peerId] || [];
+
 		if (!this.peerChannels[peerId].includes(channel)) {
 			this.peerChannels[peerId].push(channel);
 		}
 
-		if (!this.peerConnections[peerId]) {
-			this.peerConnections[peerId] = pc;
-		}
+		console.log("Chat connection ready with:", peerId);
+	}
 
-		console.log("Chat - Connecting to: ", peerId);
-		const dc = pc.createDataChannel(`chat:${peerId}`);
-		this.dataChannels[peerId] = dc;
-		this.setupDataChannel(peerId, dc);
+	startVoiceConnection(peerId) {
+		const pc = this.peerConnections[peerId];
+		if (!pc || !this.localAudioStream) return;
 
-		pc.onicecandidate = (event) => {
-			if (event.candidate) {
-				this.sendSignalingMessage(channel, peerId, {
-					type: "candidate",
-					candidate: event.candidate,
-				});
-			}
-		};
+		const track = this.localAudioStream.getAudioTracks()[0];
 
-		pc.createOffer()
-			.then((offer) => pc.setLocalDescription(offer))
-			.then(() => {
-				this.sendSignalingMessage(channel, peerId, {
-					type: "offer",
-					offer: pc.localDescription,
-				});
-			});
+		const transceiver = pc._audioTransceiver;
+
+		transceiver.sender.replaceTrack(track);
+		transceiver.direction = "sendrecv";
+
+		pc.dispatchEvent(new Event("negotiationneeded"));
+
+		console.log("Voice enabled with", peerId);
 	}
 
 	sendMessage(msg, channel) {
@@ -706,42 +685,98 @@ class rtcInterface {
 		});
 	}
 
-	handleOffer(peerId, offer, channel) {
-		const pc = this.peerConnections[peerId] ? this.peerConnections[peerId] : new RTCPeerConnection(this.rtcConfig);
-		this.peerChannels[peerId] = this.peerChannels[peerId] || [];
+	async handleOffer(peerId, offer, channel) {
+		let pc = this.peerConnections[peerId];
 
-		if (!this.peerConnections[peerId]) {
+		if (!pc) {
+			pc = this._createPeerConnection(peerId, channel);
 			this.peerConnections[peerId] = pc;
 		}
-		if (!this.peerChannels[peerId].includes(channel)) {
-			this.peerChannels[peerId].push(channel);
+
+		const offerCollision = pc.signalingState !== "stable";
+
+		const polite = harmony.selfId > peerId;
+
+		if (offerCollision && !polite) {
+			console.log("Ignoring offer (impolite peer)", peerId);
+			return;
 		}
 
-		// If the offer is for audio (voice), add local audio tracks
-		if (offer.sdp && offer.sdp.includes("m=audio")) {
-			if (this.localAudioStream) {
-				const senders = pc.getSenders();
-				this.localAudioStream.getTracks().forEach((track) => {
-					const alreadyAdded = senders.some((sender) => sender.track && sender.track.id === track.id);
-					if (!alreadyAdded) {
-						pc.addTrack(track, this.localAudioStream);
-						console.log("Added local track to peer connection");
-					}
-				});
-			} else {
-				console.warn("No local audio when handling voice offer");
-			}
+		if (offerCollision && polite) {
+			console.log("Offer collision detected — rolling back");
+
+			await pc.setLocalDescription({ type: "rollback" });
 		}
+
+		await pc.setRemoteDescription(offer);
+
+		const answer = await pc.createAnswer();
+		await pc.setLocalDescription(answer);
+
+		this.sendSignalingMessage(channel, peerId, {
+			type: "answer",
+			answer: pc.localDescription,
+		});
+	}
+
+	async handleAnswer(peerId, answer) {
+		const pc = this.peerConnections[peerId];
+		if (!pc) return;
+
+		if (pc.signalingState !== "have-local-offer") {
+			console.warn("Ignoring unexpected answer. State:", pc.signalingState);
+			return;
+		}
+
+		await pc.setRemoteDescription(answer);
+	}
+
+	handleCandidate(peerId, candidate) {
+		const pc = this.peerConnections[peerId];
+		if (pc) {
+			pc.addIceCandidate(new RTCIceCandidate(candidate));
+		}
+	}
+
+	async _negotiate(pc, peerId, channel) {
+		if (pc._isNegotiating) return;
+
+		if (pc.signalingState !== "stable") return;
+
+		pc._isNegotiating = true;
+
+		try {
+			const offer = await pc.createOffer();
+
+			if (pc.signalingState !== "stable") return;
+
+			await pc.setLocalDescription(offer);
+
+			this.sendSignalingMessage(channel, peerId, {
+				type: "offer",
+				offer: pc.localDescription,
+			});
+		} finally {
+			pc._isNegotiating = false;
+		}
+	}
+
+	_createPeerConnection(peerId, channel) {
+		const pc = new RTCPeerConnection(this.rtcConfig);
+
+		// ---- DATA CHANNEL FIRST ----
+		const dc = pc.createDataChannel("main");
+		this.dataChannels[peerId] = dc;
+		this.setupDataChannel(peerId, dc);
+
+		// ---- AUDIO TRANSCEIVER SECOND ----
+		pc._audioTransceiver = pc.addTransceiver("audio", {
+			direction: "inactive",
+		});
 
 		pc.ondatachannel = (event) => {
 			this.dataChannels[peerId] = event.channel;
 			this.setupDataChannel(peerId, event.channel);
-		};
-
-		pc.ontrack = (event) => {
-			console.log("recieved remote track", event);
-			this.remoteAudioStreams[peerId] = event.streams[0];
-			this._playRemoteAudio(peerId, event);
 		};
 
 		pc.onicecandidate = (event) => {
@@ -753,48 +788,42 @@ class rtcInterface {
 			}
 		};
 
-		// --- Add state check before setRemoteDescription ---
-		if (
-			pc.signalingState === "stable" ||
-			pc.signalingState === "have-local-offer" ||
-			pc.signalingState === "have-remote-offer"
-		) {
-			pc.setRemoteDescription(new RTCSessionDescription(offer))
-				.then(() => pc.createAnswer())
-				.then((answer) => pc.setLocalDescription(answer))
-				.then(() => {
-					this.sendSignalingMessage(channel, peerId, {
-						type: "answer",
-						answer: pc.localDescription,
-					});
-				});
-		} else {
-			console.warn(`handleOffer: Skipping setRemoteDescription due to signalingState=${pc.signalingState}`);
-		}
-	}
+		// optional, for debug
+		pc.onsignalingstatechange = () => {
+			console.log("Signaling state:", pc.signalingState, "with", peerId);
+		};
 
-	handleAnswer(peerId, answer) {
-		const pc = this.peerConnections[peerId];
-		if (pc) {
-			// --- Add state check before setRemoteDescription ---
-			if (pc.signalingState === "have-local-offer" || pc.signalingState === "have-remote-offer") {
-				pc.setRemoteDescription(new RTCSessionDescription(answer));
+		pc.addEventListener("track", (event) => {
+			console.log("Remote track received", event);
+
+			let stream;
+
+			if (event.streams && event.streams.length > 0) {
+				stream = event.streams[0];
 			} else {
-				console.warn(`handleAnswer: Skipping setRemoteDescription due to signalingState=${pc.signalingState}`);
+				// create stream manually
+				stream = new MediaStream([event.track]);
 			}
-		}
+
+			this.remoteAudioStreams[peerId] = stream;
+
+			this._playRemoteAudio(peerId, stream);
+		});
+
+		pc.onnegotiationneeded = () => this._negotiate(pc, peerId, channel);
+
+		return pc;
 	}
 
-	handleCandidate(peerId, candidate) {
-		const pc = this.peerConnections[peerId];
-		if (pc) {
-			pc.addIceCandidate(new RTCIceCandidate(candidate));
+	_playRemoteAudio(peerId, stream) {
+		if (!stream) {
+			console.warn(`No MediaStream found for peer ${peerId}`);
+			return;
 		}
-	}
 
-	_playRemoteAudio(peerId, trackEvent) {
-		// Create or reuse an <audio> element for this peer
+		// Create or reuse <audio> element
 		let audioElem = document.getElementById(`remote-audio-${peerId}`);
+
 		if (!audioElem) {
 			audioElem = document.createElement("audio");
 			audioElem.id = `remote-audio-${peerId}`;
@@ -802,38 +831,42 @@ class rtcInterface {
 			audioElem.style.display = "none";
 			document.body.appendChild(audioElem);
 		}
-		let stream = trackEvent.streams[0];
-		// --- Add controllable GainNode for remote audio ---
+
+		// --- AudioContext setup ---
 		if (!this._audioContext) {
 			this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
 		}
-		// Disconnect previous gain node if exists
+
+		// Remove previous gain node if it exists
 		if (this.remoteAudioGainNodes[peerId]) {
 			this.remoteAudioGainNodes[peerId].disconnect();
 		}
 
+		// Create audio graph
 		const remoteSource = this._audioContext.createMediaStreamSource(stream);
 		const remoteGainNode = this._audioContext.createGain();
-		// Set gain to friend volume or 1
-		const friendPref = harmony.localPrefs.friends.filter((f) => f.id == peerId)[0];
+
+		const friendPref = harmony.localPrefs.friends.find((f) => f.id === peerId);
+
 		remoteGainNode.gain.value = friendPref && typeof friendPref.volume === "number" ? friendPref.volume : 1;
 
 		const remoteDestination = this._audioContext.createMediaStreamDestination();
+
 		remoteSource.connect(remoteGainNode);
 		remoteGainNode.connect(remoteDestination);
 
-		// Save gain node for later control
 		this.remoteAudioGainNodes[peerId] = remoteGainNode;
 
-		//CHROME BUG THAT TOOK ME 5 HOURS TO FIND
-		let dummy = new Audio();
+		// Chrome autoplay workaround
+		const dummy = new Audio();
 		dummy.srcObject = stream;
 		dummy.muted = true;
-		//YAY I <3 CHROMIUM
+		dummy.play().catch(() => {});
 
+		// Play processed stream
 		audioElem.srcObject = remoteDestination.stream;
 
-		// attachAudioVisualizer(remoteDestination.stream);
+		// UI visualization
 		visualizeBorderWithAudio(remoteDestination.stream, peerId);
 	}
 
@@ -851,9 +884,10 @@ class rtcInterface {
 			let deviceId = null;
 
 			const audioInputDevices = harmony.localPrefs.devices.audioInputDevices;
-			const preferredDevice = harmony.localPrefs.devices.audioInputDevice
-				? harmony.localPrefs.devices.audioInputDevice.deviceId
-				: audioInputDevices[0].deviceId; // Use the first device as preferred
+			const preferredDevice =
+				harmony.localPrefs.devices.audioInputDevice ?
+					harmony.localPrefs.devices.audioInputDevice.deviceId
+				:	audioInputDevices[0].deviceId; // Use the first device as preferred
 			deviceId = preferredDevice;
 			if (!preferredDevice) {
 				//no device in prefs, alert user

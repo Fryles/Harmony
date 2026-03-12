@@ -1,148 +1,104 @@
 {
   "requests": [],
   "users": {
-    "f842a398-9470-4644-8165-64aad570267f": {
-      "name": "matchamatchamatrcha",
-      "secret": "b2fe6cd46334bdada6e231e3db867463bd8e79f5ffb9b3f0fb0a0961f4d2ad57",
-      "session": "5250343ba55ecf2733647c8e983471ea",
-      "sessionTimestamp": 1752699400885
+    "08cd1665-4c14-4179-ac3e-e6eb6215588f": {
+      "name": "BIGBOI",
+      "secret": "$argon2id$v=19$m=65536,t=3,p=1$uAHbMakEA+2c8DzGBXvGIg$Cu1MWguHuzG3pm/w4JokUj8GY5JK9cURrxbfUvH3g+Q",
+      "session": "ab20a54151daba19f8a361a20c670a96",
+      "sessionTimestamp": 1773258160269
     },
-    "a268f8bb-a15a-48cc-90fd-f92642f41b95": {
-      "name": "magenter",
-      "secret": "f86fd27c170cbe8f67f5ece71cd059b5176f709ba1c262fda61ccfc5017429da",
-      "session": "522cb92f0bf83e8f9cc072bf07ee3f3a",
-      "sessionTimestamp": 1752763513025
-    },
-    "735ea16a-ce96-4d80-8499-c57f9e812502": {
-      "name": "Epic Dog",
-      "secret": "da9687649e3e2857040af9bd3bd03a31b4a476696ed5f40edc828cf4dea20ac8",
-      "session": "22a5fb1cf5c89fa22f45e6f235cfe6aa",
-      "sessionTimestamp": 1755884184608
-    },
-    "a150e6b4-a897-4424-8cbc-be228316a143": {
-      "name": "Pog Dog",
-      "secret": "65a475d62a07f7668e244d5d96fbffc651f94b889596cf36153f6a1c00f851c6",
-      "session": "491215253c63a3d7f7a6038d2b0ccd1e",
-      "sessionTimestamp": 1755886659979
+    "8b2f0c5d-571d-42c3-8815-b4d9e8b4e0d6": {
+      "name": "Radical Monkey",
+      "secret": "$argon2id$v=19$m=65536,t=3,p=1$a5xVogVBcA/WWQlerexAmw$dHRhnldh0Rl+0yXnFYlE0WoueoZ16oDMa3iMXOV/Nv0",
+      "session": "71048fcd0a2599651b1a01e3e7cb6d76",
+      "sessionTimestamp": 1773258169331
     }
   },
   "ips": {},
   "servers": {
-    "asd": {
-      "name": "asd",
-      "id": "3a517a7a-3eaa-42a3-816e-897896688e1e",
-      "secret": "203c790f8bd5be13358d46f597d369ab1bf967f05590e88d0b51def33b7154b6",
-      "options": {
-        "serverOpen": true,
-        "serverUnlisted": false,
-        "serverStoredMessaging": true
-      },
-      "admin": "f842a398-9470-4644-8165-64aad570267f",
-      "messages": []
-    },
-    "test": {
-      "name": "test",
-      "id": "2a9aa2f3-f477-4ea0-9b0c-a48c28902043",
-      "secret": "4d843073fb5fbf710e58a952f9475e3cb777011ecc065f6ab870f2cd28a2f4ea",
+    "123123": {
+      "name": "123123",
+      "id": "1deafd83-f719-4645-adce-f77f91138741",
+      "secret": "1bf1417dd69357688f9e9f7125fb7545061d3e77302ef3a57821844e8971a599",
       "options": {
         "serverOpen": false,
         "serverUnlisted": false,
         "serverStoredMessaging": true
       },
-      "admin": "f842a398-9470-4644-8165-64aad570267f",
-      "messages": [
-        {
-          "timestamp": 1755882333822,
-          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
-          "username": "Epic Dog",
-          "content": "dd",
-          "type": "text",
-          "color": "#3bdbcd"
-        },
-        {
-          "timestamp": 1755882473515,
-          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
-          "username": "Epic Dog",
-          "content": "hi",
-          "type": "text",
-          "color": "#3bdbcd"
-        },
-        {
-          "timestamp": 1755882478552,
-          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
-          "username": "Pog Dog",
-          "content": "yo",
-          "type": "text",
-          "color": "#3bdbcd"
-        },
-        {
-          "timestamp": 1755884963685,
-          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
-          "username": "Epic Dog",
-          "content": "asd",
-          "type": "text",
-          "color": "#3bdbcd"
-        },
-        {
-          "timestamp": 1755886306942,
-          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
-          "username": "Pog Dog",
-          "content": "tewst",
-          "type": "text",
-          "color": "#3bdbcd"
-        },
-        {
-          "timestamp": 1755886311507,
-          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
-          "username": "Epic Dog",
-          "content": "yo",
-          "type": "text",
-          "color": "#9bdbfd"
-        },
-        {
-          "timestamp": 1755886314066,
-          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
-          "username": "Pog Dog",
-          "content": "hey",
-          "type": "text",
-          "color": "#3bdbcd"
-        },
-        {
-          "timestamp": 1755886758954,
-          "user": "735ea16a-ce96-4d80-8499-c57f9e812502",
-          "username": "Epic Dog",
-          "content": "asd",
-          "type": "text",
-          "color": "#9bdbfd"
-        },
-        {
-          "timestamp": 1755886762150,
-          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
-          "username": "Pog Dog",
-          "content": "hey",
-          "type": "text",
-          "color": "#3bdbcd"
-        },
-        {
-          "timestamp": 1755886795453,
-          "user": "a150e6b4-a897-4424-8cbc-be228316a143",
-          "username": "Pog Dog",
-          "content": "das",
-          "type": "text",
-          "color": "#3bdbcd"
-        }
-      ]
+      "admin": "08cd1665-4c14-4179-ac3e-e6eb6215588f",
+      "messages": []
     },
-    "test3": {
-      "name": "test3",
-      "id": "9e41874d-4df7-4353-a5ce-a7e3a898602e",
-      "secret": "7cb91d4d6b9a1576625dbc8674373b0d9d8da902de3b91e64f10ee2a26049de8",
+    "open": {
+      "name": "open",
+      "id": "17c3dafb-edbb-4d8d-9b6d-6be2b71e3393",
+      "secret": "54a2bf0662a18d26eb3870ff2a55766a4560eedeb8644638f97cee2c932ff364",
       "options": {
         "serverOpen": true,
         "serverUnlisted": false,
         "serverStoredMessaging": true
       },
-      "admin": "a268f8bb-a15a-48cc-90fd-f92642f41b95",
+      "admin": "08cd1665-4c14-4179-ac3e-e6eb6215588f",
+      "messages": [
+        {
+          "timestamp": 1773258193867,
+          "user": "8b2f0c5d-571d-42c3-8815-b4d9e8b4e0d6",
+          "username": "Radical Monkey",
+          "content": "hey",
+          "type": "text",
+          "color": "#7162e3"
+        },
+        {
+          "timestamp": 1773258696292,
+          "user": "08cd1665-4c14-4179-ac3e-e6eb6215588f",
+          "username": "Breezy Goose",
+          "content": "?",
+          "type": "text",
+          "color": "#7162e3"
+        },
+        {
+          "timestamp": 1773258701584,
+          "user": "8b2f0c5d-571d-42c3-8815-b4d9e8b4e0d6",
+          "username": "Radical Monkey",
+          "content": "yo",
+          "type": "text",
+          "color": "#7162e3"
+        },
+        {
+          "timestamp": 1773329725186,
+          "user": "08cd1665-4c14-4179-ac3e-e6eb6215588f",
+          "username": "BIGBOI",
+          "content": "k",
+          "type": "text",
+          "color": "#7162e3"
+        },
+        {
+          "timestamp": 1773329837118,
+          "user": "8b2f0c5d-571d-42c3-8815-b4d9e8b4e0d6",
+          "username": "Radical Monkey",
+          "content": "soob'",
+          "type": "text",
+          "color": "#7162e3"
+        },
+        {
+          "timestamp": 1773329840590,
+          "user": "08cd1665-4c14-4179-ac3e-e6eb6215588f",
+          "username": "BIGBOI",
+          "content": "yes",
+          "type": "text",
+          "color": "#7162e3"
+        }
+      ]
+    },
+    "test": {
+      "name": "test",
+      "id": "93807897-5b65-426e-aee2-7ca0c365a0d7",
+      "secret": "b63ba28a3689e51d19db9109e884d434d4d1713aa08db9be3758327e64c3483a",
+      "options": {
+        "serverOpen": false,
+        "serverUnlisted": false,
+        "serverStoredMessaging": true
+      },
+      "admin": "8b2f0c5d-571d-42c3-8815-b4d9e8b4e0d6",
       "messages": []
     }
   }

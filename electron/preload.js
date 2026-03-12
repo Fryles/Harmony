@@ -24,19 +24,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	},
 });
 
-// load prefs here
+// load prefs as soon as we can insert them to DOM
 window.addEventListener("DOMContentLoaded", async () => {
 	prefs = await ipcRenderer.invoke("get-prefs", accId);
 	if (prefs == "") {
-		//no prefs.json
+		//no prefs.json, load defaults and save them to disk
 		prefs = defaultPrefs();
 		prefs = await autoUpdateDevices(prefs);
 		console.log("Created default prefs with : ", prefs);
 		ipcRenderer.send("update-prefs", prefs, accId);
 		loadPrefs(prefs);
-		openModal("settings-modal");
-		// Hide settings-delete and settings-close elements
-
 		return;
 	} else {
 		//we already have prefs, attempt to update w/ connected devices
@@ -95,12 +92,12 @@ function defaultPrefs() {
 		user: {
 			username: psuedoUser(uid),
 			userId: uid,
-			password: "",
+			secret: "",
 		},
 		servers: [],
 		settings: {
 			theme: "dark",
-			accentColor: "#e4956b",
+			accentColor: "#7162e3",
 			language: "en-US",
 			notifications: true,
 			checkUpdate: true,
@@ -149,6 +146,7 @@ function loadSettings(prefs) {
 
 	// Username
 	document.getElementById("username").value = prefs.user.username;
+	document.getElementById("registerUsername").value = prefs.user.username;
 	document.getElementById("userid").value = prefs.user.userId;
 
 	// Devices - populate dropdowns
@@ -276,14 +274,14 @@ function psuedoUser(userId) {
 	var prefixes = [
 		"Bigbacked",
 		"Epic",
-		"Funky",
-		"Sneaky",
+		"Inflated",
+		"Chud",
 		"Wobbly",
 		"Spicy",
-		"Quantum",
+		"Rank",
 		"Fluffy",
 		"Turbo",
-		"Mega",
+		"Horny",
 		"Ultra",
 		"Dank",
 		"Silly",
@@ -292,7 +290,7 @@ function psuedoUser(userId) {
 		"Bizarre",
 		"Cosmic",
 		"Sleepy",
-		"Cranky",
+		"Tard",
 		"Jumpy",
 		"Loopy",
 		"Wonky",
@@ -326,7 +324,6 @@ function psuedoUser(userId) {
 		"Borked",
 		"Dopey",
 		"Zonky",
-		"Yolo",
 		"Vibey",
 		"Breezy",
 		"Dizzy",

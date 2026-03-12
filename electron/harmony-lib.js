@@ -5,6 +5,7 @@ import { colorSliderWithAudio } from "./audiovis.js";
 class HarmonyUtils {
 	static isPasswordComplex(pwd) {
 		// At least 8 chars
+		//this is validated serverside too btw
 		return typeof pwd === "string" && pwd.length >= 8;
 	}
 
@@ -63,6 +64,7 @@ class HarmonyUtils {
 //TODO stored server messages not loading on first join
 //TODO verify a newly added friend is selected when opening friends list
 //TODO verify voice user addittion to ui is working. cause its not with 3 peers
+//TODO prefs are storing messages in server obj, they shouldnt
 
 // FriendsManager class for all friends-related logic
 class FriendsManager {
@@ -265,6 +267,9 @@ class FriendsManager {
 				} else {
 					console.warn("Already have this request");
 				}
+			} else {
+				// likely already sent
+				console.warn("Failed to send friend request:", data);
 			}
 		});
 		uiManager.closeModals();
@@ -280,13 +285,15 @@ class FriendsManager {
 				if (request.status == "cancelled" && request.to == harmony.selfId) {
 					//remove from incoming
 					harmony.friendReqs.incoming = harmony.friendReqs.incoming.filter(
-						(r) => r.chat != request.chat && r.from != request.from
+						(r) => r.chat != request.chat && r.from != request.from,
 					);
 					//update ui
 					let reqDiv = document.querySelector(`.friend-request-item[reqFrom="${request.from}"]`);
 					if (reqDiv) {
 						reqDiv.remove();
 					}
+				} else {
+					console.warn("Received friend request response for a request we did not send", request);
 				}
 				return;
 			}
@@ -339,7 +346,7 @@ class FriendsManager {
 				}
 				uiManager.showToast(
 					`${DOMPurify.sanitize(request.fromName)} Sent You a Friend Request`,
-					this.showFriendRequests
+					this.showFriendRequests,
 				);
 			}
 		});
@@ -353,7 +360,7 @@ class FriendsManager {
 			}
 		});
 
-		socket.emit("checkharmony.FriendReqs", ({ incoming, outgoing }) => {
+		socket.emit("checkFriendReqs", ({ incoming, outgoing }) => {
 			console.log(incoming, outgoing);
 
 			// if any accepted outgoing requests are not in harmony.localPrefs.friends, add them
@@ -492,7 +499,7 @@ class chatManager {
 				if (serverResponse.success) {
 					console.log("Message stored on server:", serverResponse);
 				} else {
-					showToast("Failed to store message on server (sleepy sovo?)");
+					uiManager.showToast("Failed to store message on server (sleepy sovo?)");
 					console.error("Failed to store message on server:", serverResponse.error);
 				}
 			});
@@ -532,7 +539,7 @@ class chatManager {
 							sovoBtn.dispatchEvent(new Event("click", { bubbles: true }));
 						}
 					},
-					msg.color ? msg.color : "is-primary"
+					msg.color ? msg.color : "is-primary",
 				);
 			} else {
 				uiManager.showToast(
@@ -554,7 +561,7 @@ class chatManager {
 							}
 						}
 					},
-					msg.color ? msg.color : "is-primary"
+					msg.color ? msg.color : "is-primary",
 				);
 			}
 		}
@@ -622,7 +629,7 @@ class chatManager {
 
 		let sender = userUtils.userLookup(msg.user);
 		un.innerText = DOMPurify.sanitize(
-			sender.nick != "" && sender.nick != undefined ? `${sender.nick} (${sender.name})` : sender.name
+			sender.nick != "" && sender.nick != undefined ? `${sender.nick} (${sender.name})` : sender.name,
 		);
 		un.setAttribute("data-user-id", msg.user);
 		un.setAttribute("data-timestamp", msg.timestamp);
@@ -679,7 +686,7 @@ class chatManager {
 		//filter dups (can occur with multiple windows/instances)
 		messages = messages.filter(
 			(m, i, arr) =>
-				arr.findIndex((x) => x.timestamp === m.timestamp && x.user === m.user && x.content === m.content) === i
+				arr.findIndex((x) => x.timestamp === m.timestamp && x.user === m.user && x.content === m.content) === i,
 		);
 
 		//constrain to less than harmony.localprefs maxMsgHistory
@@ -1045,7 +1052,7 @@ class uiManager {
 		const userId = userDiv.id;
 		let friend = userUtils.userLookup(userId);
 		let username = DOMPurify.sanitize(
-			friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name
+			friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name,
 		);
 
 		// Create popup
@@ -1062,7 +1069,7 @@ class uiManager {
 		popup.style.color = "#fff";
 		popup.innerHTML = `
 			<div style="margin-bottom: 0.5rem; font-weight: bold;">${DOMPurify.sanitize(
-				username
+				username,
 			)}<br><span class="is-clickable" style="font-weight: normal;font-size:0.9em;color: var(--bulma-grey-light)" onclick="navigator.clipboard.writeText(this.innerText);showToast('Copied User ID');">${userId}</span></div>
 			<div style="margin-bottom: 0.5rem;">
 				<label style="font-size: 0.9em;">Voice Volume</label>
@@ -1159,7 +1166,7 @@ class uiManager {
 
 		let friend = userUtils.userLookup(userId);
 		let username = DOMPurify.sanitize(
-			friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name
+			friend.nick != "" && friend.nick != undefined ? `${friend.nick} (${friend.name})` : friend.name,
 		);
 
 		// Format timestamp
@@ -1190,11 +1197,11 @@ class uiManager {
 				<span>Sent: ${DOMPurify.sanitize(tsStr)}</span>
 			</div>
 			${
-				isFriend
-					? `<button class="button is-small is-danger" id="removeFriendChatBtn" style="width:100%;margin-bottom:0.3rem;">
+				isFriend ?
+					`<button class="button is-small is-danger" id="removeFriendChatBtn" style="width:100%;margin-bottom:0.3rem;">
 						<i class="fas fa-user-minus"></i> Remove Friend
 					</button>`
-					: `<button class="button is-small is-link" id="addFriendChatBtn" style="width:100%;margin-bottom:0.3rem;">
+				:	`<button class="button is-small is-link" id="addFriendChatBtn" style="width:100%;margin-bottom:0.3rem;">
 						<i class="fas fa-user-plus"></i> Add Friend
 					</button>`
 			}

@@ -18,14 +18,15 @@ if (!app.isPackaged) {
 }
 console.log("using userData path of", userDataPath);
 
-function createWindow() {
+function createWindow(id) {
 	// Create the browser window.
 	const mainWindow = new BrowserWindow({
-		width: 800,
+		width: 1000,
 		height: 600,
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),
 			contextIsolation: true,
+			partition: `persist:harmony${id}`, // Use a persistent partition to maintain session data
 		},
 	});
 	// if (app.isPackaged) {
@@ -55,15 +56,14 @@ app.whenReady().then(() => {
 	ipcMain.on("update-prefs", updatePrefs);
 	ipcMain.handle("get-prefs", getPrefs);
 
-	createWindow();
+	createWindow("main");
 	if (!app.isPackaged) {
-		createWindow();
+		createWindow("dev");
 	}
 
 	app.on("activate", function () {
-		// On macOS it's common to re-create a window in the app when the
-		// dock icon is clicked and there are no other windows open.
-		if (BrowserWindow.getAllWindows().length === 0) createWindow();
+		// macOS specific behavior: re-create a window in the app when sock icon clicked
+		if (BrowserWindow.getAllWindows().length === 0) createWindow(); // create a new window with a random id
 	});
 });
 
@@ -77,7 +77,7 @@ app.on("window-all-closed", function () {
 function getPrefs(event, accountId) {
 	try {
 		// Use accountId to determine prefs path
-		const id = accountId || (event && event.sender && event.sender.id);
+		const id = accountId || event.sender.id;
 
 		const prefsPath = path.join(userDataPath, `prefs-${id}.json`);
 		if (fs.existsSync(prefsPath)) {

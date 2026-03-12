@@ -10,6 +10,7 @@ import { instrument } from "@socket.io/admin-ui";
 import { JSDOM } from "jsdom";
 import DOMPurify from "dompurify";
 import dotenv from "dotenv";
+import argon2 from "argon2";
 
 // ENVIRONMENT VARIABLES
 dotenv.config({ path: "./main.env" });
@@ -24,6 +25,7 @@ const io = new socketio(server, {
 		origin: ["https://admin.socket.io"],
 		credentials: true,
 	},
+	maxHttpBufferSize: 1e8, // 100 MB
 });
 instrument(io, {
 	auth: { type: "basic", username: process.env.SOCKETIO_ADMIN_USER, password: process.env.SOCKETIO_ADMIN_PWD_HASH },
@@ -45,100 +47,166 @@ const addServerThrottle = {};
 const addUserThrottle = {};
 const window = new JSDOM("").window;
 const purify = DOMPurify(window);
+const argonConfig = {
+	type: argon2.argon2id,
+	timeCost: 3,
+	memoryCost: 1 << 16,
+	parallelism: 1,
+	hashLength: 32,
+};
+const sessionExpiry = process.env.SESSION_EXPIRY ? parseInt(process.env.SESSION_EXPIRY) : 24 * 60 * 60 * 1000;
 
 // AUTHENTICATION MIDDLEWARE
 io.use(async (socket, next) => {
 	const userId = socket.handshake.auth.userId;
+	const session = socket.handshake.auth.session;
+
 	// Validate userId is a valid UUID (v4)
 	const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 	if (!uuidV4Regex.test(userId)) {
 		return next(new Error("Invalid userId: must be a valid UUID v4"));
 	}
-	//try session first
-	if (db.data.users[userId] && socket.handshake.auth.session) {
-		if (
-			db.data.users[userId].session === socket.handshake.auth.session &&
-			db.data.users[userId].sessionTimestamp &&
-			Date.now() - db.data.users[userId].sessionTimestamp < 24 * 60 * 60 * 1000
-		) {
-			//good auth and session timestamp is within 24 hours
-			console.log("client logged in with session token");
-			return next();
-		} else {
-			//sent bad session, continue with auth
-			console.log("client sent incorrect session");
-		}
+
+	const user = db.data.users[userId];
+	if (!user) {
+		return next(new Error("User not found, please register a new user"));
 	}
-
-	const secret = socket.handshake.auth.secret;
-
-	const sessionToken = crypto.randomBytes(16).toString("hex");
-	const sessionTimestamp = Date.now();
-	if (db.data.users[userId] && db.data.users[userId].secret === secret) {
-		//this userID exists and has correct secret, give session token
-		await db.update(({ users }) => {
-			users[userId].session = sessionToken;
-			users[userId].sessionTimestamp = sessionTimestamp;
-		});
-		console.log("client logged in, sending session w/ ready");
-		return next();
-	} else if (!db.data.users[userId]) {
-		// Limit account creation per IP
-		const ip = socket.handshake.address;
-		const now = Date.now();
-		const DAY = 24 * 60 * 60 * 1000;
-		if (!addUserThrottle[ip]) {
-			addUserThrottle[ip] = [];
+	// Check existing session first
+	if (user && session) {
+		if (user.session === session && user.sessionTimestamp && Date.now() - user.sessionTimestamp < sessionExpiry) {
+			console.log("client logged in with valid session token");
+			return next();
 		}
-		// Remove timestamps older than 24 hours
-		addUserThrottle[ip] = addUserThrottle[ip].filter((ts) => now - ts < DAY);
-		if (addUserThrottle[ip].length >= 4) {
-			console.log("Account creation limit reached for IP:", ip);
-			let err = new Error("Account creation limit reached for this IP. Try again later.");
-			err.message = "Account creation limit reached for this IP. Try again later.";
-			return next(err);
-		}
-		addUserThrottle[ip].push(now);
-		console.log("client registering new user with id", userId);
-		let userName = socket.handshake.auth.userName;
-		// Sanitize username
-		userName = purify.sanitize(userName);
-		if (!userName || typeof userName !== "string" || userName.length > 32 || userName.length < 3) {
-			let err = new Error("Invalid username");
-			err.message = "Invalid username: must be a string between 3 and 32 characters";
-			return next(err);
-		}
-
-		//no user for this id, registering and giving token
-		await db.update(
-			({ users }) =>
-				(users[userId] = {
-					name: userName,
-					secret: secret,
-					session: sessionToken,
-					sessionTimestamp: sessionTimestamp,
-				})
-		);
-		console.log("client registered, sending session w/ ready");
-		return next();
 	} else {
-		//failed auth for existing user...
-		console.log("client failed auth for existing user");
-
-		return next(new Error("Authentication failed: invalid secret for userId"));
+		return next(new Error("Authentication failed: session token required"));
 	}
 });
 
 let connections = {};
-// app.get("/connections", (req, res) => {
-// 	res.json(Object.values(connections));
-// });
+app.get("/connections", (req, res) => {
+	res.json(connections);
+});
+
+app.post("/login", async (req, res) => {
+	// obtain session using secret
+	const userId = req.body.id;
+	const userName = req.body.name;
+	const user = db.data.users[userId];
+	const secret = req.body.secret;
+	if (!userId || !userName || !secret) {
+		return res.status(400).json({ error: "id, name, and secret are required" });
+	}
+	if (user) {
+		if (!(await argon2.verify(user.secret, secret))) {
+			return res.status(401).json({ error: "Authentication failed: invalid secret for existing userId" });
+		}
+		// Generate new session token
+		const sessionToken = crypto.randomBytes(16).toString("hex");
+		const sessionTimestamp = Date.now();
+		await db.update(({ users }) => {
+			users[userId].session = sessionToken;
+			users[userId].sessionTimestamp = sessionTimestamp;
+		});
+		res.json({
+			session: sessionToken,
+			sessionExpiresOn: sessionTimestamp + sessionExpiry,
+		});
+	} else {
+		return res.status(404).json({ error: "User not found, please register." });
+	}
+});
+
+app.post("/register", async (req, res) => {
+	if (addUserThrottle[req.ip] && Date.now() - addUserThrottle[req.ip] < 60 * 60 * 1000) {
+		// 1 hour throttle per IP for user registration to prevent abuse
+		// DISABLED FOR TESTING
+		// return res.status(429).json({ error: "Too many requests, please try again later." });
+	}
+	const userId = req.body.id;
+	const userName = req.body.name;
+	const secret = req.body.secret;
+	if (!userId || !userName || !secret) {
+		return res.status(400).json({ error: "id, name, and secret are required" });
+	}
+	// registerUser will validate and sanitize before creating user and session
+	const result = await registerUser(userId, userName, secret);
+	if (result.success) {
+		res.json({ session: result.session });
+		// add ip to db for throttling
+		addUserThrottle[req.ip] = Date.now();
+		console.log("added ", req.ip, " to user throttle");
+	} else {
+		res.status(400).json({ error: result.error });
+	}
+});
+
+app.post("/turn-credentials", async (req, res) => {
+	// ensure user is authenticated with bearer session
+	const authHeader = req.headers.authorization;
+	if (!authHeader || !authHeader.startsWith("Bearer ")) {
+		return res.status(401).json({ error: "Authorization header missing or invalid" });
+	}
+	const sessionToken = authHeader.split(" ")[1];
+
+	const user = db.data.users[req.body.userId];
+	// console.log("SESSION TOKEN:", sessionToken);
+	// console.log("USER SESSION:", user.session);
+
+	if (
+		!user ||
+		user.session !== sessionToken ||
+		!user.sessionTimestamp ||
+		Date.now() - user.sessionTimestamp > sessionExpiry
+	) {
+		return res.status(401).json({ error: "Invalid or expired session token" });
+	}
+
+	const response = await fetch(
+		`https://${process.env.TURN_CRED_DOMAIN}/api/v1/turn/credential?secretKey=${process.env.TURN_CRED_SECRET}`,
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				expiryInSeconds: process.env.TURN_CRED_EXPIRY || 1200, // default to 20 min expiry
+				label: req.ip || Math.random().toString(36).substring(2, 15),
+			}),
+		},
+	);
+
+	const data = await response.json();
+	//validate response
+	if (!data || !data.username || !data.password || !data.expiryInSeconds) {
+		console.error("Invalid TURN credentials response", data);
+		return res.status(500).json({ error: "Failed to obtain TURN credentials" });
+	}
+
+	res.json({
+		iceServers: [
+			{
+				urls: ["stun:global.relay.metered.ca:80", "stun:global.relay.metered.ca:443"],
+			},
+			{
+				urls: [
+					"turn:global.relay.metered.ca:80",
+					"turn:global.relay.metered.ca:80?transport=tcp",
+					"turn:global.relay.metered.ca:443",
+					"turns:global.relay.metered.ca:443?transport=tcp",
+				],
+				username: data.username,
+				credential: data.password,
+			},
+		],
+		ttl: data.expiryInSeconds,
+	});
+});
 
 // MESSAGING LOGIC
 io.on("connection", (socket) => {
 	console.log("User connected with id", socket.id);
 
-	// Handles client ready event, adds peer to connections and sends session token
+	// Handles client ready event, adds peer to connections
 	socket.on("ready", () => {
 		const peerId = socket.handshake.auth.userId;
 
@@ -149,13 +217,6 @@ io.on("connection", (socket) => {
 				delete connections[peerId];
 			}
 			console.log(`Added ${peerId} to connections`);
-
-			// Send session token to the peer
-			socket.send({
-				from: "server",
-				target: peerId,
-				session: db.data.users[peerId].session,
-			});
 
 			// Create new peer
 			const newPeer = { socketId: socket.id, peerId };
@@ -176,6 +237,7 @@ io.on("connection", (socket) => {
 		socket.join(chnl);
 		const peersInChannel = [];
 		for (const peerId in connections) {
+			if (!connections[peerId]) continue; // in case peer disconnects mid loop
 			const peerSocket = io.sockets.sockets.get(connections[peerId].socketId);
 			if (peerSocket && peerSocket.rooms.has(chnl)) {
 				peersInChannel.push(peerId);
@@ -304,6 +366,8 @@ io.on("connection", (socket) => {
 		const userId = socket.handshake.auth.userId;
 		const requests = db.data.requests;
 
+		//TODO only allow 20 outgoing requests at a time.
+
 		//check for removal request, if found, remove
 		const removalIdx = requests.findIndex((r) => r.from === userId && r.to === friend && r.status === "remove");
 		if (removalIdx !== -1) {
@@ -387,6 +451,7 @@ io.on("connection", (socket) => {
 				await db.write();
 			}
 		} else {
+			console.log("Request not found or already accepted/rejected");
 		}
 	});
 
@@ -395,7 +460,7 @@ io.on("connection", (socket) => {
 		const userId = socket.handshake.auth.userId;
 		const requests = db.data.requests;
 		const idx = requests.findIndex(
-			(r) => r.from === userId && r.to === req.to && r.chat === req.chat && r.status === "add"
+			(r) => r.from === userId && r.to === req.to && r.chat === req.chat && r.status === "add",
 		);
 		if (idx !== -1) {
 			requests.splice(idx, 1);
@@ -466,7 +531,7 @@ io.on("connection", (socket) => {
 	socket.on("checkFriendReqs", async (callback) => {
 		const userId = socket.handshake.auth.userId;
 		const incoming = db.data.requests.filter(
-			(r) => r.to === userId && r.status != "recieved" && r.status != "accepted" && r.status != "rejected"
+			(r) => r.to === userId && r.status != "recieved" && r.status != "accepted" && r.status != "rejected",
 		);
 		const outgoing = db.data.requests.filter((r) => r.from === userId && r.status != "recieved");
 
@@ -480,12 +545,13 @@ io.on("connection", (socket) => {
 
 	// Authenticates a server using name, id, and secret
 	socket.on("serverAuth", async (name, id, secret, callback) => {
+		const userId = socket.handshake.auth.userId;
 		const servers = db.data.servers || {};
 		if (callback && servers[name] && servers[name].id === id && servers[name].secret === secret) {
 			//good auth
 			callback(servers[name]);
 		} else {
-			//fail
+			// epic fail
 			callback(false);
 		}
 	});
@@ -516,7 +582,7 @@ io.on("connection", (socket) => {
 					s.name.toLowerCase().includes(name) ||
 					s.name.toLowerCase().replace(/\s/g, "").includes(name) ||
 					s.name.toLowerCase().includes(name.replace(/\s/g, "")) ||
-					s.name.toLowerCase().replace(/\s/g, "").includes(name.replace(/\s/g, ""))
+					s.name.toLowerCase().replace(/\s/g, "").includes(name.replace(/\s/g, "")),
 			);
 			//filter matches to only open servers
 			matches = matches.filter((s) => {
@@ -534,9 +600,8 @@ io.on("connection", (socket) => {
 
 	// Registers a new server with provided details
 	socket.on("registerServer", async (server, callback) => {
-		const userId = socket.handshake.auth.userId;
 		const now = Date.now();
-
+		const userId = socket.handshake.auth.userId;
 		if (
 			addServerThrottle[userId] &&
 			now - addServerThrottle[userId] < 6 * 60 * 60 * 1000 // 6 hours
@@ -592,24 +657,35 @@ io.on("connection", (socket) => {
 	// Set user name/password
 	socket.on("setUser", async (userPrefs, callback) => {
 		const socketUserId = socket.handshake.auth.userId;
-		const socketSecret = socket.handshake.auth.secret;
 		const user = db.data.users[userPrefs.id];
 		const userId = userPrefs.id;
+		if (!userPrefs || !userPrefs.oldSecret || !userId) {
+			if (callback) callback({ success: false, error: "Invalid user preferences" });
+			return;
+		}
 		if (!user) {
 			if (callback) callback({ success: false, error: "User not found" });
 			return;
 		}
+		if (userId !== socketUserId) {
+			console.log("UserId mismatch in setUser. Socket userId:", socketUserId, "Prefs userId:", userId);
+			if (callback) callback({ success: false, error: "UserId mismatch" });
+			return;
+		}
 		//ensure socket user is updating their own user and has correct secret
-		if (userId !== socketUserId || user.secret !== socketSecret) {
-			console.log(userId, socketUserId, user.secret, socketSecret);
 
+		if (!(await argon2.verify(user.secret, userPrefs.oldSecret))) {
 			if (callback) callback({ success: false, error: "Bad auth silly" });
 			return;
 		}
-		//update info
-
+		// calc new hash if secret is being updated, otherwise keep old hash
+		if (userPrefs.newSecret) {
+			userPrefs.newSecret = await argon2.hash(userPrefs.newSecret, argonConfig);
+		}
 		await db.update(({ users }) => {
-			users[userId].secret = userPrefs.secret || user.secret; // allow updating secret
+			if (userPrefs.newSecret !== undefined && userPrefs.newSecret !== null && userPrefs.newSecret !== "") {
+				users[userId].secret = userPrefs.newSecret;
+			}
 			// Sanitize name before updating
 			users[userId].name = userPrefs.name ? purify.sanitize(userPrefs.name) : user.name;
 		});
@@ -677,7 +753,7 @@ io.on("connection", (socket) => {
 
 		// Remove channel before storing message
 		const { channel, ...messageWithoutChannel } = message;
-		messageWithoutChannel.content = message.content;
+		messageWithoutChannel.content = purify.sanitize(message.content);
 		server.messages.push(messageWithoutChannel);
 		await db.write();
 
@@ -723,6 +799,52 @@ app.use(sirv("public"));
 // RUN APP
 server.listen(PORT, console.log(`Listening on PORT ${PORT}`));
 
+// HELPER FUNCTIONS
+
+// Registers a new user with provided userId, name, and secret. Validates input and returns session token if successful.
+async function registerUser(userId, name, secret) {
+	//verify userId is a valid uuidv4
+	const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+	if (!uuidV4Regex.test(userId)) {
+		return { success: false, error: "Invalid userId: must be a valid UUID v4" };
+	}
+
+	let user = db.data.users[userId];
+	if (user) {
+		return { success: false, error: "UserId already exists" };
+	}
+	// param validation and sanitization
+	if (!secret || typeof secret !== "string") {
+		return { success: false, error: "Invalid secret" };
+	}
+
+	let userName = purify.sanitize(name || "");
+
+	if (!userName || typeof userName !== "string" || userName.length < 3 || userName.length > 32) {
+		return { success: false, error: "Invalid username" };
+	}
+
+	const hashedSecret = await argon2.hash(secret, argonConfig);
+
+	const sessionToken = crypto.randomBytes(16).toString("hex");
+	const sessionTimestamp = Date.now();
+	await db.update(({ users }) => {
+		users[userId] = {
+			name: userName,
+			secret: hashedSecret,
+			session: sessionToken,
+			sessionTimestamp: sessionTimestamp,
+		};
+	});
+
+	console.log("New user registered, session token issued for user", userId);
+	return {
+		success: true,
+		session: sessionToken,
+		sessionExpiresOn: sessionTimestamp + sessionExpiry,
+	};
+}
+
 //util for fake server id to avoid exposing unlisted servers when running exact server query
 // basitly it maps a server name to unique id that cannot be guessed
 function generateUuidBySeed(seedString) {
@@ -745,6 +867,7 @@ function generateUuidBySeed(seedString) {
 	return uuid;
 }
 
+// Configures DOMPurify with custom settings and hooks to sanitize user input while preserving code blocks
 function purifyConfig() {
 	// allowed URI schemes
 	const allowlist = ["http", "https", "tel", "mailto", "hrmny"];
@@ -823,17 +946,18 @@ function purifyConfig() {
 
 		// check all href attributes for validity
 		if (node.hasAttribute("href")) {
-			let href = node.getAttribute("href");
-			// default to https:// if no protocol is present
+			let href = node.getAttribute("href").trim();
 			if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(href)) {
 				href = "https://" + href;
-				node.setAttribute("href", href);
 			}
 			anchor.href = href;
-			if (anchor.protocol && !anchor.protocol.match(regex)) {
+			if (!anchor.protocol.match(regex)) {
 				node.removeAttribute("href");
+			} else {
+				node.setAttribute("href", href); // ensure updated value
 			}
 		}
+
 		// check all action attributes for validity
 		if (node.hasAttribute("action")) {
 			anchor.href = node.getAttribute("action");
