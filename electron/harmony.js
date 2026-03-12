@@ -212,8 +212,8 @@ async function init() {
 
 		document.getElementById("add-server").addEventListener("click", registerServer);
 		document.getElementById("join-server").addEventListener("click", () => {
-			const name = document.getElementById("serverNameInput").value;
-			const pwd = document.getElementById("serverPasswordInput").value;
+			const name = document.getElementById("joinServerNameInput").value;
+			const pwd = document.getElementById("joinServerPasswordInput").value;
 			addServer(name, pwd);
 		});
 
@@ -346,23 +346,23 @@ async function registerServer() {
 	let pwd = document.getElementById("serverPasswordInput").value;
 	let id = crypto.randomUUID();
 
-	const secret = await hashbrown(`server:${id}:${pwd}`);
-
-	let options = {
-		serverOpen: document.getElementById("serverOpen").checked,
-		serverUnlisted: document.getElementById("serverUnlisted").checked,
-		serverStoredMessaging: document.getElementById("serverStoredMessaging").checked,
-	};
 	if ((pwd === "" || !pwd || pwd.trim() === "") && !options.serverOpen) {
 		//empty pwd with non-open server
 		uiManager.showToast("A Closed Server Must Have a Password");
 		return;
 	}
+	let options = {
+		serverOpen: document.getElementById("serverOpen").checked,
+		serverUnlisted: document.getElementById("serverUnlisted").checked,
+		serverStoredMessaging: document.getElementById("serverStoredMessaging").checked,
+	};
 	// Password complexity check for closed servers
 	if (!options.serverOpen && !HarmonyUtils.isPasswordComplex(pwd)) {
 		uiManager.showToast("Password must be at least 8 characters.");
 		return;
 	}
+
+	const secret = await hashbrown(`${id}:${pwd}`);
 
 	if (name.length > 32 || name.length < 3) {
 		uiManager.showToast("Server name is too long or too short.");
@@ -389,7 +389,7 @@ async function registerServer() {
 			uiManager.showToast(`Created Server: ${res.server.name}`);
 			window.electronAPI.updatePrefs(harmony.localPrefs);
 			//now try to auth with the new server and join it
-			addServer(name, pwd);
+			addServer(name, pwd, false);
 		} else {
 			if (res.error) {
 				uiManager.showToast(res.error);
@@ -401,7 +401,7 @@ async function registerServer() {
 }
 
 //called in join/add server modal to attempt to find id from server name, then authenticate with the server and add to ui
-function addServer(name, pwd) {
+function addServer(name, pwd, showNotif = true) {
 	if (!name || name.trim() === "") {
 		name = document.getElementById("joinServerNameInput").value;
 		if (!name || name.trim() === "") {
@@ -416,7 +416,8 @@ function addServer(name, pwd) {
 		if (!res.id) {
 			uiManager.showToast(`Failed to join ${name}`, null, "is-danger");
 		}
-		const secret = await hashbrown(`server:${res.id}:${pwd}`);
+
+		const secret = await hashbrown(`${res.id}:${pwd}`);
 		window.socket.emit("serverAuth", name, res.id, secret, (res) => {
 			if (res) {
 				// good auth, add server to prefs and connect
@@ -432,12 +433,14 @@ function addServer(name, pwd) {
 				// Add server to UI before the "Add Server" button
 				uiManager.insertServerToUI(res);
 				// Show joined toast with click to switch to server
-				uiManager.showToast(`Joined ${DOMPurify.sanitize(res.name)}`, () => {
-					const serverItem = document.querySelector(`.server-item[name="${res.id}"]`);
-					if (serverItem) {
-						serverItem.dispatchEvent(new Event("click", { bubbles: true }));
-					}
-				});
+				if (showNotif) {
+					uiManager.showToast(`Joined ${DOMPurify.sanitize(res.name)}`, () => {
+						const serverItem = document.querySelector(`.server-item[name="${res.id}"]`);
+						if (serverItem) {
+							serverItem.dispatchEvent(new Event("click", { bubbles: true }));
+						}
+					});
+				}
 				// Update prefs and close modal
 				uiManager.closeModals();
 				window.electronAPI.updatePrefs(harmony.localPrefs);

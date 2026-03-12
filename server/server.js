@@ -546,8 +546,9 @@ io.on("connection", (socket) => {
 
 	// Authenticates a server using name, id, and secret
 	socket.on("serverAuth", async (name, id, secret, callback) => {
-		const userId = socket.handshake.auth.userId;
 		const servers = db.data.servers || {};
+		console.log(servers[name].secret, secret, id, servers[name].id);
+
 		if (callback && servers[name] && servers[name].id === id && servers[name].secret === secret) {
 			//good auth
 			callback(servers[name]);
