@@ -11,7 +11,9 @@ var prefs;
 var accId = false;
 contextBridge.exposeInMainWorld("electronAPI", {
 	updatePrefs: (prefs, accId) => ipcRenderer.send("update-prefs", prefs, accId),
+	resetPrefs: (accId) => resetPrefs(accId),
 	getPrefs: (accId) => ipcRenderer.invoke("get-prefs", accId),
+	isDev: () => ipcRenderer.invoke("is-dev"),
 	loadPrefs: (prefs) => loadPrefs(prefs),
 	getPsuedoUser: (userId) => psuedoUser(userId),
 	refreshSettings: (prefs) => {
@@ -78,14 +80,6 @@ function loadServers(prefs) {
 	serverList.innerHTML += el;
 }
 
-//bulma js
-function openModal(target) {
-	const rootEl = document.documentElement;
-	var $target = document.getElementById(target);
-	rootEl.classList.add("is-clipped");
-	$target.classList.add("is-active");
-}
-
 function defaultPrefs() {
 	let uid = crypto.randomUUID();
 	let prefs = {
@@ -121,6 +115,12 @@ function defaultPrefs() {
 		},
 	};
 	return prefs;
+}
+
+function resetPrefs(accId) {
+	ipcRenderer.send("update-prefs", defaultPrefs(), accId);
+	//refresh window
+	
 }
 
 function loadPrefs(prefs) {

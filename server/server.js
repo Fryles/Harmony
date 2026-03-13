@@ -73,7 +73,7 @@ io.use(async (socket, next) => {
 	}
 	// Check existing session first
 	if (user && session) {
-		if (user.session === session && user.sessionTimestamp && Date.now() - user.sessionTimestamp < sessionExpiry) {
+		if (user.session === session && user.sessionTimestamp && Date.now() < sessionExpiry + user.sessionTimestamp) {
 			console.log("client logged in with valid session token");
 			return next();
 		}
@@ -157,7 +157,7 @@ app.post("/turn-credentials", async (req, res) => {
 		!user ||
 		user.session !== sessionToken ||
 		!user.sessionTimestamp ||
-		Date.now() - user.sessionTimestamp > sessionExpiry
+		Date.now() > sessionExpiry + user.sessionTimestamp
 	) {
 		return res.status(401).json({ error: "Invalid or expired session token" });
 	}
@@ -185,6 +185,12 @@ app.post("/turn-credentials", async (req, res) => {
 
 	res.json({
 		iceServers: [
+			{ urls: "stun:stun.l.google.com:19302" },
+			{ urls: "stun:stun.l.google.com:5349" },
+			{ urls: "stun:stun1.l.google.com:3478" },
+			{ urls: "stun:stun1.l.google.com:5349" },
+			{ urls: "stun:stun2.l.google.com:19302" },
+			{ urls: "stun:stun2.l.google.com:5349" },
 			{
 				urls: ["stun:global.relay.metered.ca:80", "stun:global.relay.metered.ca:443"],
 			},
@@ -547,7 +553,6 @@ io.on("connection", (socket) => {
 	// Authenticates a server using name, id, and secret
 	socket.on("serverAuth", async (name, id, secret, callback) => {
 		const servers = db.data.servers || {};
-		console.log(servers[name].secret, secret, id, servers[name].id);
 
 		if (callback && servers[name] && servers[name].id === id && servers[name].secret === secret) {
 			//good auth

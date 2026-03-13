@@ -12,7 +12,7 @@ export const harmony = {
 	friendReqs: { incoming: [], outgoing: [] },
 	selfId: null,
 	rtc: null,
-	dev: true,
+	dev: await window.electronAPI.isDev(),
 };
 //for dev rn
 window.harmony = harmony;
@@ -236,6 +236,13 @@ async function init() {
 	initServerList();
 	initFriendList();
 
+	//TEMP FOR TESTING
+	document.getElementById("register-user-button").addEventListener("click", () => {
+		console.log("reseting user");
+		window.electronAPI.resetPrefs();
+		window.location.reload();
+	});
+
 	// retrieve any stored messages on server for all chats that support it
 	let since = localStorage.getItem("lastOnline") || Date.now() - 24 * 60 * 60 * 1000; // default to 24 hours ago if not set
 	if (harmony.localPrefs && harmony.localPrefs.servers) {
@@ -345,17 +352,18 @@ async function registerServer() {
 	let name = DOMPurify.sanitize(document.getElementById("serverNameInput").value);
 	let pwd = document.getElementById("serverPasswordInput").value;
 	let id = crypto.randomUUID();
+	let options = {
+		serverOpen: document.getElementById("serverOpen").checked,
+		serverUnlisted: document.getElementById("serverUnlisted").checked,
+		serverStoredMessaging: document.getElementById("serverStoredMessaging").checked,
+	};
 
 	if ((pwd === "" || !pwd || pwd.trim() === "") && !options.serverOpen) {
 		//empty pwd with non-open server
 		uiManager.showToast("A Closed Server Must Have a Password");
 		return;
 	}
-	let options = {
-		serverOpen: document.getElementById("serverOpen").checked,
-		serverUnlisted: document.getElementById("serverUnlisted").checked,
-		serverStoredMessaging: document.getElementById("serverStoredMessaging").checked,
-	};
+
 	// Password complexity check for closed servers
 	if (!options.serverOpen && !HarmonyUtils.isPasswordComplex(pwd)) {
 		uiManager.showToast("Password must be at least 8 characters.");
